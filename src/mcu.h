@@ -306,6 +306,8 @@ struct MCU {
     uint64_t analog_end_time = 0;
 
     int ssr_rd = 0;
+    
+    bool midi_ready = false;
 
     uint32_t uart_write_ptr;
     uint32_t uart_read_ptr;

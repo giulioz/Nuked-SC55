@@ -517,7 +517,11 @@ uint8_t MCU::MCU_DeviceRead(uint32_t address)
         return val;
     }
     case DEV_SCR:
+        if (dev_register[address] == 0x30)
+            midi_ready = true; // FIXME
+        return dev_register[address];
     case DEV_TDR:
+        return dev_register[address];
     case DEV_SMR:
         return dev_register[address];
     case DEV_IPRC:
@@ -970,6 +974,8 @@ void MCU::MCU_Reset(void)
 
 void MCU::MCU_PostUART(uint8_t data)
 {
+    printf("MCU_PostUART %x ready:%d write:%d ssr:%x\n", data, midi_ready, uart_write_ptr, dev_register[DEV_SSR]);
+    if (!midi_ready) return;
     uart_buffer[uart_write_ptr] = data;
     uart_write_ptr = (uart_write_ptr + 1) % uart_buffer_size;
 }

@@ -52,6 +52,7 @@ public:
     
     void deInitialize() {
         printf("Deinit %d\n", nInits);
+        memset(mcu, 0, sizeof(MCU));
         delete mcu;
     }
     
