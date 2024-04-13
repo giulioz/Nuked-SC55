@@ -43,27 +43,17 @@
 #include "submcu.h"
 #include "utils/files.h"
 
-
-static uint32_t LCD_DL, LCD_N, LCD_F, LCD_D, LCD_C, LCD_B, LCD_ID, LCD_S;
-static uint32_t LCD_DD_RAM, LCD_AC, LCD_CG_RAM;
-static uint32_t LCD_RAM_MODE = 0;
-static uint8_t LCD_Data[80];
-static uint8_t LCD_CG[64];
-
-static uint8_t lcd_enable = 1;
-static bool lcd_quit_requested = false;
-
-void LCD_Enable(uint32_t enable)
+void LCD::LCD_Enable(uint32_t enable)
 {
     lcd_enable = enable;
 }
 
-bool LCD_QuitRequested()
+bool LCD::LCD_QuitRequested()
 {
     return lcd_quit_requested;
 }
 
-void LCD_Write(uint32_t address, uint8_t data)
+void LCD::LCD_Write(uint32_t address, uint8_t data)
 {
     if (address == 0)
     {
@@ -162,21 +152,6 @@ void LCD_Write(uint32_t address, uint8_t data)
     //    printf("\n");
 }
 
-int lcd_width = 741;
-int lcd_height = 268;
-static const int lcd_width_max = 1024;
-static const int lcd_height_max = 1024;
-static SDL_Window *window;
-static SDL_Renderer *renderer;
-static SDL_Texture *texture;
-
-static std::string m_back_path = "back.data";
-
-static uint32_t lcd_buffer[lcd_height_max][lcd_width_max];
-static uint32_t lcd_background[268][741];
-
-static uint32_t lcd_init = 0;
-
 const int button_map_sc55[][2] =
 {
     SDL_SCANCODE_Q, MCU_BUTTON_POWER,
@@ -221,36 +196,14 @@ const int button_map_jv880[][2] =
 };
 
 
-void LCD_SetBackPath(const std::string &path)
+void LCD::LCD_SetBackPath(const std::string &path)
 {
     m_back_path = path;
 }
 
-void LCD_Init(void)
+void LCD::LCD_Init()
 {
     FILE *raw;
-
-    if(lcd_init)
-        return;
-
-    lcd_quit_requested = false;
-
-    std::string title = "Nuked SC-55: ";
-
-    title += rs_name[romset];
-
-    window = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, lcd_width, lcd_height, SDL_WINDOW_SHOWN);
-    if (!window)
-        return;
-
-    renderer = SDL_CreateRenderer(window, -1, 0);
-    if (!renderer)
-        return;
-
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR888, SDL_TEXTUREACCESS_STREAMING, lcd_width, lcd_height);
-
-    if (!texture)
-        return;
 
     raw = Files::utf8_fopen(m_back_path.c_str(), "rb");
     if (!raw)
@@ -259,19 +212,13 @@ void LCD_Init(void)
     fread(lcd_background, 1, sizeof(lcd_background), raw);
     fclose(raw);
 
-    lcd_init = 1;
+    lcd_init = true;
 }
 
-void LCD_UnInit(void)
-{
-    if(!lcd_init)
-        return;
-}
+const uint32_t lcd_col1 = 0x000000;
+const uint32_t lcd_col2 = 0x0050c8;
 
-uint32_t lcd_col1 = 0x000000;
-uint32_t lcd_col2 = 0x0050c8;
-
-void LCD_FontRenderStandard(int32_t x, int32_t y, uint8_t ch)
+void LCD::LCD_FontRenderStandard(int32_t x, int32_t y, uint8_t ch)
 {
     uint8_t* f;
     if (ch >= 16)
@@ -304,7 +251,7 @@ void LCD_FontRenderStandard(int32_t x, int32_t y, uint8_t ch)
     }
 }
 
-void LCD_FontRenderLevel(int32_t x, int32_t y, uint8_t ch, uint8_t width = 5)
+void LCD::LCD_FontRenderLevel(int32_t x, int32_t y, uint8_t ch, uint8_t width)
 {
     uint8_t* f;
     if (ch >= 16)
@@ -337,22 +284,22 @@ void LCD_FontRenderLevel(int32_t x, int32_t y, uint8_t ch, uint8_t width = 5)
     }
 }
 
-void LCD_Update(void)
+uint32_t* LCD::LCD_Update(void)
 {
     if (!lcd_init)
-        return;
+        return 0x00;
 
-    if (!mcu_cm300 && !mcu_st)
+    if (!mcu->mcu_cm300 && !mcu->mcu_st)
     {
-        MCU_WorkThread_Lock();
+        // MCU_WorkThread_Lock();
 
-        if (!lcd_enable && !mcu_jv880)
+        if (!lcd_enable && !mcu->mcu_jv880)
         {
             memset(lcd_buffer, 0, sizeof(lcd_buffer));
         }
         else
         {
-            if (mcu_jv880)
+            if (mcu->mcu_jv880)
             {
                 for (size_t i = 0; i < lcd_height; i++) {
                     for (size_t j = 0; j < lcd_width; j++) {
@@ -369,7 +316,7 @@ void LCD_Update(void)
                 }
             }
 
-            if (mcu_jv880)
+            if (mcu->mcu_jv880)
             {
                 for (int i = 0; i < 2; i++)
                 {
@@ -434,152 +381,20 @@ void LCD_Update(void)
             }
         }
 
-        MCU_WorkThread_Unlock();
-
-        SDL_UpdateTexture(texture, NULL, lcd_buffer, lcd_width_max * 4);
-        SDL_RenderCopy(renderer, texture, NULL, NULL);
-        SDL_RenderPresent(renderer);
+        // MCU_WorkThread_Unlock();
     }
 
-    SDL_Event sdl_event;
-    while (SDL_PollEvent(&sdl_event))
-    {
-        if (sdl_event.type == SDL_KEYDOWN)
-        {
-            if (sdl_event.key.keysym.scancode == SDL_SCANCODE_COMMA)
-                MCU_EncoderTrigger(0);
-            if (sdl_event.key.keysym.scancode == SDL_SCANCODE_PERIOD)
-                MCU_EncoderTrigger(1);
-        }
+    return (uint32_t*)lcd_buffer;
+}
 
-        switch (sdl_event.type)
-        {
-            case SDL_QUIT:
-                lcd_quit_requested = true;
-                break;
-
-            case SDL_KEYDOWN:
-            case SDL_KEYUP:
-            {
-                if (sdl_event.key.repeat)
-                    continue;
-                
-                int mask = 0;
-                uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
-
-                auto button_map = mcu_jv880 ? button_map_jv880 : button_map_sc55;
-                auto button_size = (mcu_jv880 ? sizeof(button_map_jv880) : sizeof(button_map_sc55)) / sizeof(button_map_sc55[0]);
-                for (size_t i = 0; i < button_size; i++)
-                {
-                    if (button_map[i][0] == sdl_event.key.keysym.scancode)
-                        mask |= (1 << button_map[i][1]);
-                }
-
-                if (sdl_event.type == SDL_KEYDOWN)
-                    button_pressed |= mask;
-                else
-                    button_pressed &= ~mask;
-
-                SDL_AtomicSet(&mcu_button_pressed, (int)button_pressed);
-
-#if 0
-                if (sdl_event.key.keysym.scancode >= SDL_SCANCODE_1 && sdl_event.key.keysym.scancode < SDL_SCANCODE_0)
-                {
-#if 0
-                    int kk = sdl_event.key.keysym.scancode - SDL_SCANCODE_1;
-                    if (sdl_event.type == SDL_KEYDOWN)
-                    {
-                        MCU_PostUART(0xc0);
-                        MCU_PostUART(118);
-                        MCU_PostUART(0x90);
-                        MCU_PostUART(0x30 + kk);
-                        MCU_PostUART(0x7f);
-                    }
-                    else
-                    {
-                        MCU_PostUART(0x90);
-                        MCU_PostUART(0x30 + kk);
-                        MCU_PostUART(0);
-                    }
-#endif
-                    int kk = sdl_event.key.keysym.scancode - SDL_SCANCODE_1;
-                    const int patch = 47;
-                    if (sdl_event.type == SDL_KEYDOWN)
-                    {
-                        static int bend = 0x2000;
-                        if (kk == 4)
-                        {
-                            MCU_PostUART(0x99);
-                            MCU_PostUART(0x32);
-                            MCU_PostUART(0x7f);
-                        }
-                        else if (kk == 3)
-                        {
-                            bend += 0x100;
-                            if (bend > 0x3fff)
-                                bend = 0x3fff;
-                            MCU_PostUART(0xe1);
-                            MCU_PostUART(bend & 127);
-                            MCU_PostUART((bend >> 7) & 127);
-                        }
-                        else if (kk == 2)
-                        {
-                            bend -= 0x100;
-                            if (bend < 0)
-                                bend = 0;
-                            MCU_PostUART(0xe1);
-                            MCU_PostUART(bend & 127);
-                            MCU_PostUART((bend >> 7) & 127);
-                        }
-                        else if (kk)
-                        {
-                            MCU_PostUART(0xc1);
-                            MCU_PostUART(patch);
-                            MCU_PostUART(0xe1);
-                            MCU_PostUART(bend & 127);
-                            MCU_PostUART((bend >> 7) & 127);
-                            MCU_PostUART(0x91);
-                            MCU_PostUART(0x32);
-                            MCU_PostUART(0x7f);
-                        }
-                        else if (kk == 0)
-                        {
-                            //MCU_PostUART(0xc0);
-                            //MCU_PostUART(patch);
-                            MCU_PostUART(0xe0);
-                            MCU_PostUART(0x00);
-                            MCU_PostUART(0x40);
-                            MCU_PostUART(0x99);
-                            MCU_PostUART(0x37);
-                            MCU_PostUART(0x7f);
-                        }
-                    }
-                    else
-                    {
-                        if (kk == 1)
-                        {
-                            MCU_PostUART(0x91);
-                            MCU_PostUART(0x32);
-                            MCU_PostUART(0);
-                        }
-                        else if (kk == 0)
-                        {
-                            MCU_PostUART(0x99);
-                            MCU_PostUART(0x37);
-                            MCU_PostUART(0);
-                        }
-                        else if (kk == 4)
-                        {
-                            MCU_PostUART(0x99);
-                            MCU_PostUART(0x32);
-                            MCU_PostUART(0);
-                        }
-                    }
-                }
-#endif
-                break;
-            }
-        }
+void LCD::LCD_SendButton(uint8_t button, int state) {
+    uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu->mcu_button_pressed);
+    int mask = (1 << button);
+    if (state) {
+        button_pressed |= mask;
+    } else {
+        button_pressed &= ~mask;
     }
+    SDL_AtomicSet(&mcu->mcu_button_pressed, (int)button_pressed);
 }
 
