@@ -89,7 +89,9 @@ const char* roms[ROM_SET_COUNT][5] =
     "jv880_rom2.bin",
     "jv880_waverom1.bin",
     "jv880_waverom2.bin",
-    "SR-JV80-01 Pop - CS 0x3F1CF705.bin",
+    // "SR-JV80-01 Pop - CS 0x3F1CF705.bin",
+    "SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN",
+    // "SR-JV80-09 Session - CS 0x3F381791.BIN",
 };
 
 int romset = ROM_SET_MK2;

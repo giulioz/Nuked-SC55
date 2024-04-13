@@ -12,6 +12,8 @@
 		5E0B43B82BC45C3C0028D51B /* jv880_rom1.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E0B43B42BC45C3C0028D51B /* jv880_rom1.bin */; };
 		5E0B43B92BC45C3C0028D51B /* jv880_waverom2.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E0B43B52BC45C3C0028D51B /* jv880_waverom2.bin */; };
 		5E0B43BA2BC45C3C0028D51B /* jv880_rom2.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E0B43B62BC45C3C0028D51B /* jv880_rom2.bin */; };
+		5E8415512BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN in Resources */ = {isa = PBXBuildFile; fileRef = 5E8415502BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN */; };
+		5E8415532BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN in Resources */ = {isa = PBXBuildFile; fileRef = 5E8415522BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN */; };
 		5E9FCCF42BBC8E25009EE67D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCCF32BBC8E25009EE67D /* ContentView.swift */; };
 		5E9FCCF82BBC8E25009EE67D /* ViewControllerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCCF72BBC8E25009EE67D /* ViewControllerRepresentable.swift */; };
 		5E9FCCFB2BBC8E25009EE67D /* Synth.aif in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCCFA2BBC8E25009EE67D /* Synth.aif */; };
@@ -81,6 +83,8 @@
 		5E0B43B42BC45C3C0028D51B /* jv880_rom1.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = jv880_rom1.bin; path = ../../../../build/jv880_rom1.bin; sourceTree = "<group>"; };
 		5E0B43B52BC45C3C0028D51B /* jv880_waverom2.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = jv880_waverom2.bin; path = ../../../../build/jv880_waverom2.bin; sourceTree = "<group>"; };
 		5E0B43B62BC45C3C0028D51B /* jv880_rom2.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = jv880_rom2.bin; path = ../../../../build/jv880_rom2.bin; sourceTree = "<group>"; };
+		5E8415502BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "SR-JV80-09 Session - CS 0x3F381791.BIN"; path = "../../../../../../../Downloads/SR-JV/SR-JV80-09 Session - CS 0x3F381791/SR-JV80-09 Session - CS 0x3F381791.BIN"; sourceTree = "<group>"; };
+		5E8415522BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN"; path = "../../../../../../../Downloads/SR-JV/SR-JV80-04 Vintage Synth - CS 0x3E23B90C/SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN"; sourceTree = "<group>"; };
 		5E9FCCF02BBC8E25009EE67D /* sc55AU2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = sc55AU2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E9FCCF32BBC8E25009EE67D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5E9FCCF72BBC8E25009EE67D /* ViewControllerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControllerRepresentable.swift; sourceTree = "<group>"; };
@@ -370,8 +374,10 @@
 				5E9FCD602BBCB206009EE67D /* rom_sm.bin */,
 				5E9FCD642BBCB206009EE67D /* rom1.bin */,
 				5E9FCD612BBCB206009EE67D /* rom2.bin */,
+				5E8415502BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN */,
 				5E9FCD622BBCB206009EE67D /* waverom1.bin */,
 				5E9FCD632BBCB206009EE67D /* waverom2.bin */,
+				5E8415522BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN */,
 				5E9FCD5E2BBCB1F6009EE67D /* back.data */,
 				5EE5C05A2BCA263E00673E54 /* SR-JV80-01 Pop - CS 0x3F1CF705.bin */,
 			);
@@ -471,6 +477,8 @@
 			files = (
 				5E9FCD1D2BBC8E27009EE67D /* README.md in Resources */,
 				5E9FCD5F2BBCB1F6009EE67D /* back.data in Resources */,
+				5E8415532BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN in Resources */,
+				5E8415512BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN in Resources */,
 				5E0B43BA2BC45C3C0028D51B /* jv880_rom2.bin in Resources */,
 				5E9FCD362BBC8E27009EE67D /* sc55AU2ExtensionDSPKernel.hpp in Resources */,
 				5E9FCD2E2BBC8E27009EE67D /* sc55AU2ExtensionAUProcessHelper.hpp in Resources */,
