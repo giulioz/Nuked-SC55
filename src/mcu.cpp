@@ -982,6 +982,8 @@ int SDLCALL work_thread(void* data)
                 }
             }
         }
+
+        MIDI_Update();
     }
     MCU_WorkThread_Unlock();
 
