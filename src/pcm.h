@@ -34,9 +34,44 @@
 #pragma once
 #include <stdint.h>
 
+struct Ram1VoiceInfo {
+    uint32_t addressEnd;
+    uint32_t v1;
+    uint32_t addressLoop;
+    uint32_t v3;
+    uint32_t address;
+    uint32_t v5;
+    
+    uint32_t v6; // unused
+    uint32_t v7; // unused
+};
+
+struct Ram2VoiceInfo {
+    // Set by CPU
+    uint16_t pitch; // pitch?
+    uint16_t pan; // pan
+    uint16_t revChorSend; // reverb send | chorus send
+    uint16_t v3; // loop mode/playing? | ??
+    uint16_t volume; // volume?
+    uint16_t cutoff; // cutoff freq
+    uint16_t resonance; // resonance (inverse) | filter mode
+    uint16_t v7;
+    
+    // Set by PCM
+    uint16_t v8;
+    uint16_t v9; // v3 tv?
+    uint16_t volumeTV; // volume tv
+    uint16_t cutoffTV; // cutoff tv
+
+    uint16_t v12; // unused
+    uint16_t v13; // unused
+    uint16_t v14; // unused
+    uint16_t v15; // unused
+};
+
 struct pcm_t {
-    uint32_t ram1[32][8];
-    uint16_t ram2[32][16];
+    Ram1VoiceInfo ram1[32];
+    Ram2VoiceInfo ram2[32];
     uint32_t select_channel;
     uint32_t voice_mask;
     uint32_t voice_mask_pending;
@@ -50,6 +85,7 @@ struct pcm_t {
     uint32_t irq_channel;
     uint32_t irq_assert;
 
+    // if the first sample has been rendered already
     uint32_t nfs;
 
     uint32_t tv_counter;

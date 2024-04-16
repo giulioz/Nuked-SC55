@@ -233,7 +233,7 @@ endif()
 
 if(APPLE)
     find_library(LIBCoreAudio CoreAudio)
-    target_link_libraries(nuked-sc55 PRIVATE ${LIBCoreAudio})
+    target_link_libraries(nuked-sc55 PRIVATE ${LIBCoreAudio} ncurses)
 endif()
 
 

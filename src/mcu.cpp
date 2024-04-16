@@ -33,6 +33,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <curses.h>
 #define SDL_MAIN_HANDLED
 #include "SDL.h"
 #include "mcu.h"
@@ -396,6 +397,8 @@ uint8_t MCU_DeviceRead(uint32_t address)
         return val;
     }
     case DEV_SCR:
+        if (mcu_jv880) // fixme for test mode
+            return 0x00;
     case DEV_TDR:
     case DEV_SMR:
         return dev_register[address];
@@ -667,6 +670,8 @@ uint32_t MCU_Read32(uint32_t address)
     return (b0 << 24) + (b1 << 16) + (b2 << 8) + b3;
 }
 
+uint8_t mystery_value[8] = {0};
+
 void MCU_Write(uint32_t address, uint8_t value)
 {
     uint8_t page = (address >> 16) & 0xf;
@@ -771,6 +776,11 @@ void MCU_Write(uint32_t address, uint8_t value)
                     printf("Unknown write %x %x\n", address, value);
                 }
             }
+        }
+        else if (address >= 0x6196 && address < 0x619a)
+        {
+            // JV880?
+            mystery_value[address - 0x6196] = value;
         }
         else
         {
@@ -983,6 +993,18 @@ int SDLCALL work_thread(void* data)
     return 0;
 }
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0') 
+
+
 static void MCU_Run()
 {
     bool working = true;
@@ -997,7 +1019,56 @@ static void MCU_Run()
 
         LCD_Update();
         SDL_Delay(15);
+
+        move(0, 0);
+        printw("Mystery Value: %x %x %x %x", mystery_value[0], mystery_value[1], mystery_value[2], mystery_value[3]);
+        move(1, 0);
+        printw("Voice Enable:  " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN ,
+               BYTE_TO_BINARY((pcm.voice_mask >> 0) & 0xff), BYTE_TO_BINARY((pcm.voice_mask >> 8) & 0xff),
+               BYTE_TO_BINARY((pcm.voice_mask >> 16) & 0xff), BYTE_TO_BINARY((pcm.voice_mask >> 24) & 0xff));
+        move(2, 0);
+        printw("Voice Enable P: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN ,
+               BYTE_TO_BINARY((pcm.voice_mask_pending >> 0) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_pending >> 8) & 0xff),
+               BYTE_TO_BINARY((pcm.voice_mask_pending >> 16) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_pending >> 24) & 0xff));
+        move(3, 0);
+        printw("Voice Enable U: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN ,
+               BYTE_TO_BINARY((pcm.voice_mask_updating >> 0) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_updating >> 8) & 0xff),
+               BYTE_TO_BINARY((pcm.voice_mask_updating >> 16) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_updating >> 24) & 0xff));
+        move(4, 0);
+        printw("Cfg 3C: %x    Cfg 3D: %x    IRQ Ch: %x    IRQ As: %x", pcm.config_reg_3c, pcm.config_reg_3d, pcm.irq_channel, pcm.irq_assert);
+        move(5, 0);
+        printw("NFS: %x    TV Cnt: %x", pcm.nfs, pcm.tv_counter);
+        
+        // for (size_t i = 0; i < 32; i++)
+        // {
+        //     move(7 + i, 0);
+        //     printw("%08x %08x %08x %08x %08x %08x %08x %08x",
+        //         pcm.ram1[i].addressEnd, pcm.ram1[i].v1, pcm.ram1[i].addressLoop, pcm.ram1[i].v3,
+        //         pcm.ram1[i].address, pcm.ram1[i].v5, pcm.ram1[i].v6, pcm.ram1[i].v7);
+        // }
+
+        for (size_t i = 0; i < 32; i++)
+        {
+            move(7 + i, 0);
+            printw("%04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x",
+                pcm.ram2[i].pitch, pcm.ram2[i].pan, pcm.ram2[i].revChorSend, pcm.ram2[i].v3,
+                pcm.ram2[i].volume, pcm.ram2[i].cutoff, pcm.ram2[i].resonance, pcm.ram2[i].v7,
+                pcm.ram2[i].v8, pcm.ram2[i].v9, pcm.ram2[i].volumeTV, pcm.ram2[i].cutoffTV,
+                pcm.ram2[i].v12, pcm.ram2[i].v13, pcm.ram2[i].v14, pcm.ram2[i].v15);
+        }
+        
+        // move(9, 0);
+        // printw("%04x %04x %04x %04x %04x %04x %04x %04x",
+        //     pcm.ram2[0][0], pcm.ram2[0][1], pcm.ram2[0][2], pcm.ram2[0][3],
+        //     pcm.ram2[0][4], pcm.ram2[0][5], pcm.ram2[0][6], pcm.ram2[0][7]);
+        // move(10, 0);
+        // printw("%04x %04x %04x %04x %04x %04x %04x %04x",
+        //     pcm.ram2[0][8], pcm.ram2[0][9], pcm.ram2[0][10], pcm.ram2[0][11],
+        //     pcm.ram2[0][12], pcm.ram2[0][13], pcm.ram2[0][14], pcm.ram2[0][15]);
+        
+        refresh();
     }
+
 
     work_thread_run = false;
     SDL_WaitThread(thread, 0);
@@ -1212,6 +1283,8 @@ static void closeAllR()
 
 int main(int argc, char *argv[])
 {
+    initscr();
+
     (void)argc;
     std::string basePath;
 
