@@ -418,6 +418,7 @@ enum {
     ROM_SET_MK1,
     ROM_SET_CM300,
     ROM_SET_JV880,
+    ROM_SET_JD990,
     ROM_SET_COUNT
 };
 

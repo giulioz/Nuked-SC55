@@ -56,7 +56,8 @@ const char* rs_name[ROM_SET_COUNT] = {
     "SC-55st",
     "SC-55mk1",
     "CM-300/SCC-1",
-    "JV880"
+    "JV880",
+    "JD990"
 };
 
 const char* roms[ROM_SET_COUNT][5] =
@@ -90,13 +91,19 @@ const char* roms[ROM_SET_COUNT][5] =
     "jv880_waverom1.bin",
     "jv880_waverom2.bin",
     "SR-JV80-01 Pop - CS 0x3F1CF705.bin",
+    
+    "",
+    "JD990-V1.05.bin",
+    "",
+    "",
+    "",
 };
 
 int romset = ROM_SET_MK2;
 
 static const int ROM1_SIZE = 0x8000;
 static const int ROM2_SIZE = 0x80000;
-static const int RAM_SIZE = 0x400;
+static const int RAM_SIZE = 0x800;
 static const int SRAM_SIZE = 0x8000;
 static const int NVRAM_SIZE = 0x8000; // JV880 only
 static const int CARDRAM_SIZE = 0x8000; // JV880 only
@@ -122,6 +129,7 @@ int mcu_mk1 = 0; // 0 - SC-55mkII, SC-55ST. 1 - SC-55, CM-300/SCC-1
 int mcu_cm300 = 0; // 0 - SC-55, 1 - CM-300/SCC-1
 int mcu_st = 0; // 0 - SC-55mk2, 1 - SC-55ST
 int mcu_jv880 = 0; // 0 - SC-55, 1 - JV880
+int mcu_jd990 = 0; // 0 - SC-55, 1 - JD990
 
 static int ga_int[8];
 static int ga_int_enable = 0;
@@ -471,11 +479,32 @@ int rom2_mask = ROM2_SIZE - 1;
 uint8_t MCU_Read(uint32_t address)
 {
     uint32_t address_rom = address & 0x3ffff;
-    if (address & 0x80000 && !mcu_jv880)
+    if (address & 0x80000 && !mcu_jv880 && !mcu_jd990)
         address_rom |= 0x40000;
     uint8_t page = (address >> 16) & 0xf;
     address &= 0xffff;
     uint8_t ret = 0xff;
+
+    if (mcu_jd990)
+    {
+        if (page == 0)
+        {
+            if (!(address & 0x8000))
+                ret = rom2[address & 0x7fff];
+            else if (address >= 0xf780 && address < 0xff80 && (dev_register[DEV_RAME] & 0x80) != 0)
+                ret = ram[(address - 0xf780) & 0x7ff];
+            else if (address >= 0xff80)
+                ret = MCU_DeviceRead(address & 0x7f);
+            else
+                printf("read %x%04x\n", page, address);
+        }
+        else
+        {
+            printf("read %x%04x\n", page, address);
+        }
+        return ret;
+    }
+
     switch (page)
     {
     case 0:
@@ -671,6 +700,25 @@ void MCU_Write(uint32_t address, uint8_t value)
 {
     uint8_t page = (address >> 16) & 0xf;
     address &= 0xffff;
+    
+    if (mcu_jd990)
+    {
+        if (page == 0)
+        {
+            if (address >= 0xf780 && address < 0xff80 && (dev_register[DEV_RAME] & 0x80) != 0)
+                ram[(address - 0xf780) & 0x7ff] = value;
+            else if (address >= 0xff80)
+                MCU_DeviceWrite(address & 0x7f, value);
+            else
+                printf("write %x%04x %02x\n", page, address, value);
+        }
+        else
+        {
+            printf("write %x%04x %02x\n", page, address, value);
+        }
+        return;
+    }
+
     if (page == 0)
     {
         if (address & 0x8000)
@@ -953,7 +1001,7 @@ int SDLCALL work_thread(void* data)
 
         TIMER_Clock(mcu.cycles);
 
-        if (!mcu_mk1 && !mcu_jv880)
+        if (!mcu_mk1 && !mcu_jv880 && !mcu_jd990)
             SM_Update(mcu.cycles);
         else
         {
@@ -1253,6 +1301,12 @@ int main(int argc, char *argv[])
                 autodetect = false;
                 break;
             }
+            else if (!strcmp(argv[i], "-jd990"))
+            {
+                romset = ROM_SET_JD990;
+                autodetect = false;
+                break;
+            }
         }
     }
 
@@ -1302,6 +1356,7 @@ int main(int argc, char *argv[])
     mcu_cm300 = false;
     mcu_st = false;
     mcu_jv880 = false;
+    mcu_jd990 = false;
     switch (romset)
     {
         case ROM_SET_ST:
@@ -1314,6 +1369,9 @@ int main(int argc, char *argv[])
         case ROM_SET_CM300:
             mcu_mk1 = true;
             mcu_cm300 = true;
+            break;
+        case ROM_SET_JD990:
+            mcu_jd990 = true;
             break;
         case ROM_SET_JV880:
             mcu_jv880 = true;
@@ -1367,7 +1425,7 @@ int main(int argc, char *argv[])
     memset(&mcu, 0, sizeof(mcu_t));
 
 
-    if (fread(rom1, 1, ROM1_SIZE, s_rf[0]) != ROM1_SIZE)
+    if (!mcu_jd990 && fread(rom1, 1, ROM1_SIZE, s_rf[0]) != ROM1_SIZE)
     {
         fprintf(stderr, "FATAL ERROR: Failed to read the mcu ROM1.\n");
         fflush(stderr);
@@ -1389,7 +1447,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (mcu_mk1)
+    if (mcu_jd990)
+    {
+
+    }
+    else if (mcu_mk1)
     {
         if (fread(tempbuf, 1, 0x100000, s_rf[2]) != 0x100000)
         {
