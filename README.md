@@ -118,7 +118,30 @@ K -> CHORUS R
 LEFT -> PART L
 RIGHT -> PART R
 ```
+- JV-880 buttons are mapped as such (currently hardcoded) (WIP):
 
-- `-mk2`, `-st`, `mk1` and `-cm300` command line arguments can be used to specify rom set. If no model is specified emulator will try to autodetect rom set (based on file names). 
+```Q - UNKNOWN (YET)
+W - UNKNOWN (YET)
+E - SYSTEM
+R - RHYTHM
+T - UTILITY
+< (Comma)- CURSOR
+> (Period) - CURSOR
+A - PATCH/PERFORM MODE
+G - ENTER
+LEFTARROW - UNKNOWN
+RIGHTARROW - UNKNOWN
+
+How to use PATCHES
+T, Navigate with (< , >) until "Util: Factory Preset" with period, Press G twice in order to use PATCHES
+
+How to Play the DEMO TRACKS to test if SOUND is working
+T, Navigate with (< , >) until "Util: ROM play", Press G once in order to playback the DEMOs
+
+How to use the Expansion Cards
+T, Navigate with (< , >) until "Util: Load patch group," G three times
+```
+
+- `-mk2`, `-st`, `mk1` , `-cm300` and `-jv880` command line arguments can be used to specify rom set. If no model is specified emulator will try to autodetect rom set (based on file names). 
 
 - Due to a bug in the SC-55mk2's firmware, some parameters don't reset properly on startup. Do GM, GS or MT-32 reset using buttons to fix this issue.
