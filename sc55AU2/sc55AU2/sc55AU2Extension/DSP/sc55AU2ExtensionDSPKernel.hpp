@@ -33,7 +33,8 @@ public:
         destFormat = *outputFormat;
 
         AudioStreamBasicDescription sourceDescription;
-        sourceDescription.mSampleRate = 66207;
+//        sourceDescription.mSampleRate = 66207;
+        sourceDescription.mSampleRate = 64000;
         sourceDescription.mBytesPerFrame = 4;
         sourceDescription.mBitsPerChannel = 16;
         sourceDescription.mFormatID = kAudioFormatLinearPCM;
