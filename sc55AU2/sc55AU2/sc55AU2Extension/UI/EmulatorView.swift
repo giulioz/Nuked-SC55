@@ -111,6 +111,7 @@ public struct Renderer {
 class Screen : ObservableObject {
     @Published
     var toggle: Bool = false
+    var frames: Int64 = -1
     public  var image: Image? {
         didSet {
             DispatchQueue.main.async { [weak self] in
@@ -124,8 +125,11 @@ class Screen : ObservableObject {
     
     let displayCallback: CVDisplayLinkOutputCallback = { displayLink, inNow, inOutputTime, flagsIn, flagsOut, displayLinkContext in
         let screen = unsafeBitCast(displayLinkContext, to: Screen.self)
+        screen.frames = screen.frames + 1
         screen.renderer.draw()
-        screen.image = Image(bitmap: screen.renderer.bitmap)
+        if (screen.frames % 8) == 0 {
+            screen.image = Image(bitmap: screen.renderer.bitmap)
+        }
         return kCVReturnSuccess
     }
     
@@ -137,7 +141,6 @@ class Screen : ObservableObject {
             NSLog("Display Link created with error: %d", error)
             return
         }
-
         CVDisplayLinkSetOutputCallback(link, displayCallback, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
         CVDisplayLinkStart(link)
     }
@@ -174,7 +177,6 @@ struct EmulatorView: View {
         VStack {
             screen.image?
                 .resizable()
-                .interpolation(.none)
                 .frame(width: CGFloat(lcd_width)/2, height: CGFloat(lcd_height)/2, alignment: .center)
                 .aspectRatio(contentMode: .fit)
                 .onAppear(perform: { screen.renderer.audioUnit = audioUnit })
