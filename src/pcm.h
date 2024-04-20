@@ -34,6 +34,26 @@
 #pragma once
 #include <stdint.h>
 
+// config_reg_3c
+// 0: bit depth?
+// 1: bit depth?
+// 2: bit depth?
+// 3: bit depth?
+// 4: bit depth?
+// 5: bit depth?
+// 6: oversampling
+// 7: output on/off
+
+// config_reg_3d
+// 0: reg_slots
+// 1: reg_slots
+// 2: reg_slots
+// 3: reg_slots
+// 4: reg_slots
+// 5: ~WCS7/WA20
+// 6: 
+// 7: 
+
 struct Ram1VoiceInfo {
     uint32_t addressEnd;
     uint32_t v1;
