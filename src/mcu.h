@@ -36,7 +36,6 @@
 #include <stdint.h>
 #include <vector>
 #include "mcu_interrupt.h"
-#include <SDL2/SDL_atomic.h>
 #include "SDL.h"
 #include "pcm.h"
 #include "lcd.h"
@@ -192,7 +191,9 @@ struct mcu_t {
     uint8_t sleep;
     uint8_t ex_ignore;
     int32_t exception_pending;
+    uint8_t pending_interrupts;
     uint8_t interrupt_pending[INTERRUPT_SOURCE_MAX];
+    uint8_t pending_trapas;
     uint8_t trapa_pending[16];
     uint64_t cycles;
 };
@@ -260,7 +261,7 @@ const uint32_t uart_buffer_size = 8192;
 static const int audio_buffer_size = 4096 * 8;
 static const int audio_page_size = 512;
 
-const size_t rf_num = 5;
+static const size_t rf_num = 5;
 
 struct MCU {
     int romset = 0;
@@ -288,6 +289,7 @@ struct MCU {
     int rom2_mask = ROM2_SIZE - 1;
 
     short sample_buffer[audio_buffer_size] = {0};
+    int sample_read_ptr = 0;
     int sample_write_ptr = 0;
 
     int ga_int[8] = {0};
@@ -328,15 +330,6 @@ struct MCU {
 
     SDL_mutex *init_lock;
 
-    FILE *s_rf[rf_num] =
-    {
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr
-    };
-
     Pcm pcm;
     LCD lcd;
     MCU_Timer mcu_timer;
@@ -351,7 +344,177 @@ struct MCU {
     uint32_t MCU_Read32(uint32_t address);
     void MCU_Write(uint32_t address, uint8_t value);
     void MCU_Write16(uint32_t address, uint16_t value);
-
+    
+    inline uint32_t MCU_GetAddress(uint8_t page, uint16_t address) {
+        return (page << 16) + address;
+    }
+    
+    inline uint8_t MCU_ReadCodeAdvance(void) {
+        uint8_t ret = MCU_Read(MCU_GetAddress(mcu.cp, mcu.pc));
+        mcu.pc++;
+        return ret;
+    }
+    
+    inline void MCU_SetRegisterByte(uint8_t reg, uint8_t val)
+    {
+        mcu.r[reg] = val;
+    }
+    
+    inline uint32_t MCU_GetVectorAddress(uint32_t vector)
+    {
+        return MCU_Read32(vector * 4);
+    }
+    
+    inline uint32_t MCU_GetPageForRegister(uint32_t reg)
+    {
+        if (reg >= 6)
+            return mcu.tp;
+        else if (reg >= 4)
+            return mcu.ep;
+        return mcu.dp;
+    }
+    
+    inline void MCU_ControlRegisterWrite(uint32_t reg, uint32_t siz, uint32_t data)
+    {
+        if (siz)
+        {
+            if (reg == 0)
+            {
+                mcu.sr = data;
+                mcu.sr &= sr_mask;
+            }
+            else if (reg == 5) // FIXME: undocumented
+            {
+                mcu.dp = data & 0xff;
+            }
+            else if (reg == 4) // FIXME: undocumented
+            {
+                mcu.ep = data & 0xff;
+            }
+            else if (reg == 3) // FIXME: undocumented
+            {
+                mcu.br = data & 0xff;
+            }
+            else
+            {
+                MCU_ErrorTrap();
+            }
+        }
+        else
+        {
+            if (reg == 1)
+            {
+                mcu.sr &= ~0xff;
+                mcu.sr |= data & 0xff;
+                mcu.sr &= sr_mask;
+            }
+            else if (reg == 3)
+            {
+                mcu.br = data;
+            }
+            else if (reg == 4)
+            {
+                mcu.ep = data;
+            }
+            else if (reg == 5)
+            {
+                mcu.dp = data;
+            }
+            else if (reg == 7)
+            {
+                mcu.tp = data;
+            }
+            else
+            {
+                MCU_ErrorTrap();
+            }
+        }
+    }
+    
+    inline uint32_t MCU_ControlRegisterRead(uint32_t reg, uint32_t siz)
+    {
+        uint32_t ret = 0;
+        if (siz)
+        {
+            if (reg == 0)
+            {
+                ret = mcu.sr & sr_mask;
+            }
+            else if (reg == 5) // FIXME: undocumented
+            {
+                ret = mcu.dp | (mcu.dp << 8);
+            }
+            else if (reg == 4) // FIXME: undocumented
+            {
+                ret = mcu.ep | (mcu.ep << 8);
+            }
+            else if (reg == 3) // FIXME: undocumented
+            {
+                ret = mcu.br | (mcu.br << 8);;
+            }
+            else
+            {
+                MCU_ErrorTrap();
+            }
+            ret &= 0xffff;
+        }
+        else
+        {
+            if (reg == 1)
+            {
+                ret = mcu.sr & sr_mask;
+            }
+            else if (reg == 3)
+            {
+                ret = mcu.br;
+            }
+            else if (reg == 4)
+            {
+                ret = mcu.ep;
+            }
+            else if (reg == 5)
+            {
+                ret = mcu.dp;
+            }
+            else if (reg == 7)
+            {
+                ret = mcu.tp;
+            }
+            else
+            {
+                MCU_ErrorTrap();
+            }
+            ret &= 0xff;
+        }
+        return ret;
+    }
+    
+    inline void MCU_SetStatus(uint32_t condition, uint32_t mask)
+    {
+        if (condition)
+            mcu.sr |= mask;
+        else
+            mcu.sr &= ~mask;
+    }
+    
+    inline void MCU_PushStack(uint16_t data)
+    {
+        if (mcu.r[7] & 1)
+            MCU_Interrupt_Exception(this, EXCEPTION_SOURCE_ADDRESS_ERROR);
+        mcu.r[7] -= 2;
+        MCU_Write16(mcu.r[7], data);
+    }
+    
+    inline uint16_t MCU_PopStack(void)
+    {
+        uint16_t ret;
+        if (mcu.r[7] & 1)
+            MCU_Interrupt_Exception(this, EXCEPTION_SOURCE_ADDRESS_ERROR);
+        ret = MCU_Read16(mcu.r[7]);
+        mcu.r[7] += 2;
+        return ret;
+    }
+    
     uint8_t MCU_ReadP0(void);
     uint8_t MCU_ReadP1(void);
     void MCU_WriteP0(uint8_t data);
@@ -380,17 +543,11 @@ struct MCU {
     void MCU_Init(void);
     void MCU_Reset(void);
     void MCU_PatchROM(void);
-    void closeAllR();
+    static void closeAllR();
 
-    uint32_t MCU_GetAddress(uint8_t page, uint16_t address);
-    uint8_t MCU_ReadCode(void);
-    uint8_t MCU_ReadCodeAdvance(void);
-    void MCU_SetRegisterByte(uint8_t reg, uint8_t val);
-    uint32_t MCU_GetVectorAddress(uint32_t vector);
-    uint32_t MCU_GetPageForRegister(uint32_t reg);
-    void MCU_ControlRegisterWrite(uint32_t reg, uint32_t siz, uint32_t data);
-    uint32_t MCU_ControlRegisterRead(uint32_t reg, uint32_t siz);
-    void MCU_SetStatus(uint32_t condition, uint32_t mask);
-    void MCU_PushStack(uint16_t data);
-    uint16_t MCU_PopStack(void);
+    enum class ResetType {
+        NONE,
+        GS_RESET,
+        GM_RESET,
+    };
 };

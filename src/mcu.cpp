@@ -33,7 +33,6 @@
  */
 #include <stdio.h>
 #include <string.h>
-#include <chrono>
 #define SDL_MAIN_HANDLED
 #include "SDL.h"
 #include "mcu.h"
@@ -61,44 +60,48 @@ const char* rs_name[ROM_SET_COUNT] = {
 
 const char* roms[ROM_SET_COUNT][5] =
 {
-    "rom1.bin",
-    "rom2.bin",
-    "waverom1.bin",
-    "waverom2.bin",
-    "rom_sm.bin",
-
-    "rom1.bin",
-    "rom2_st.bin",
-    "waverom1.bin",
-    "waverom2.bin",
-    "rom_sm.bin",
-
-    "sc55_rom1.bin",
-    "sc55_rom2.bin",
-    "sc55_waverom1.bin",
-    "sc55_waverom2.bin",
-    "sc55_waverom3.bin",
-
-    "cm300_rom1.bin",
-    "cm300_rom2.bin",
-    "cm300_waverom1.bin",
-    "cm300_waverom2.bin",
-    "cm300_waverom3.bin",
-
-    "jv880_rom1.bin",
-    "jv880_rom2.bin",
-    "jv880_waverom1.bin",
-    "jv880_waverom2.bin",
-    // "SR-JV80-01 Pop - CS 0x3F1CF705.bin",
-    "SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN",
-    // "SR-JV80-09 Session - CS 0x3F381791.BIN",
+    {
+        "rom1.bin",
+        "rom2.bin",
+        "waverom1.bin",
+        "waverom2.bin",
+        "rom_sm.bin"
+    },
+    {
+        "rom1.bin",
+        "rom2_st.bin",
+        "waverom1.bin",
+        "waverom2.bin",
+        "rom_sm.bin"
+    },
+    {
+        "sc55_rom1.bin",
+        "sc55_rom2.bin",
+        "sc55_waverom1.bin",
+        "sc55_waverom2.bin",
+        "sc55_waverom3.bin"
+    },
+    {
+        "cm300_rom1.bin",
+        "cm300_rom2.bin",
+        "cm300_waverom1.bin",
+        "cm300_waverom2.bin",
+        "cm300_waverom3.bin"
+    },
+    {
+        "jv880_rom1.bin",
+        "jv880_rom2.bin",
+        "jv880_waverom1.bin",
+        "jv880_waverom2.bin",
+        "jv880_waverom_expansion.bin"
+    }
 };
 
 int romset = ROM_SET_MK2;
 
 void MCU::MCU_ErrorTrap(void)
 {
-    printf("trap %.2x %.4x\n", mcu.cp, mcu.pc);
+    return;
 }
 
 uint8_t MCU::RCU_Read(void)
@@ -106,198 +109,49 @@ uint8_t MCU::RCU_Read(void)
     return 0;
 }
 
+int mcu_mk1 = 0; // 0 - SC-55mkII, SC-55ST. 1 - SC-55, CM-300/SCC-1
+int mcu_cm300 = 0; // 0 - SC-55, 1 - CM-300/SCC-1
+int mcu_st = 0; // 0 - SC-55mk2, 1 - SC-55ST
+int mcu_jv880 = 0; // 0 - SC-55, 1 - JV880
+
+static int ga_int[8];
+static int ga_int_enable = 0;
+static int ga_int_trigger = 0;
+static int ga_lcd_counter = 0;
+
+
+uint8_t dev_register[0x80];
+
+static uint8_t sw_pos = 3;
+static uint8_t io_sd = 0x00;
+
+SDL_atomic_t mcu_button_pressed = { 0 };
+
 enum {
     ANALOG_LEVEL_RCU_LOW = 0,
     ANALOG_LEVEL_RCU_HIGH = 0,
     ANALOG_LEVEL_SW_0 = 0,
-    ANALOG_LEVEL_SW_1 = 0,
-    ANALOG_LEVEL_SW_2 = 0,
-    ANALOG_LEVEL_SW_3 = 0,
-    ANALOG_LEVEL_BATTERY = 0x3ff,
+    ANALOG_LEVEL_SW_1 = 0x155,
+    ANALOG_LEVEL_SW_2 = 0x2aa,
+    ANALOG_LEVEL_SW_3 = 0x3ff,
+    ANALOG_LEVEL_BATTERY = 0x2a0,
 };
-
-uint32_t MCU::MCU_GetAddress(uint8_t page, uint16_t address) {
-    return (page << 16) + address;
-}
-
-uint8_t MCU::MCU_ReadCode(void) {
-    return MCU_Read(MCU_GetAddress(mcu.cp, mcu.pc));
-}
-
-uint8_t MCU::MCU_ReadCodeAdvance(void) {
-    uint8_t ret = MCU_ReadCode();
-    mcu.pc++;
-    return ret;
-}
-
-void MCU::MCU_SetRegisterByte(uint8_t reg, uint8_t val)
-{
-    mcu.r[reg] = val;
-}
-
-uint32_t MCU::MCU_GetVectorAddress(uint32_t vector)
-{
-    return MCU_Read32(vector * 4);
-}
-
-uint32_t MCU::MCU_GetPageForRegister(uint32_t reg)
-{
-    if (reg >= 6)
-        return mcu.tp;
-    else if (reg >= 4)
-        return mcu.ep;
-    return mcu.dp;
-}
-
-void MCU::MCU_ControlRegisterWrite(uint32_t reg, uint32_t siz, uint32_t data)
-{
-    if (siz)
-    {
-        if (reg == 0)
-        {
-            mcu.sr = data;
-            mcu.sr &= sr_mask;
-        }
-        else if (reg == 5) // FIXME: undocumented
-        {
-            mcu.dp = data & 0xff;
-        }
-        else if (reg == 4) // FIXME: undocumented
-        {
-            mcu.ep = data & 0xff;
-        }
-        else if (reg == 3) // FIXME: undocumented
-        {
-            mcu.br = data & 0xff;
-        }
-        else
-        {
-            MCU_ErrorTrap();
-        }
-    }
-    else
-    {
-        if (reg == 1)
-        {
-            mcu.sr &= ~0xff;
-            mcu.sr |= data & 0xff;
-            mcu.sr &= sr_mask;
-        }
-        else if (reg == 3)
-        {
-            mcu.br = data;
-        }
-        else if (reg == 4)
-        {
-            mcu.ep = data;
-        }
-        else if (reg == 5)
-        {
-            mcu.dp = data;
-        }
-        else if (reg == 7)
-        {
-            mcu.tp = data;
-        }
-        else
-        {
-            MCU_ErrorTrap();
-        }
-    }
-}
-
-uint32_t MCU::MCU_ControlRegisterRead(uint32_t reg, uint32_t siz)
-{
-    uint32_t ret = 0;
-    if (siz)
-    {
-        if (reg == 0)
-        {
-            ret = mcu.sr & sr_mask;
-        }
-        else if (reg == 5) // FIXME: undocumented
-        {
-            ret = mcu.dp | (mcu.dp << 8);
-        }
-        else if (reg == 4) // FIXME: undocumented
-        {
-            ret = mcu.ep | (mcu.ep << 8);
-        }
-        else if (reg == 3) // FIXME: undocumented
-        {
-            ret = mcu.br | (mcu.br << 8);;
-        }
-        else
-        {
-            MCU_ErrorTrap();
-        }
-        ret &= 0xffff;
-    }
-    else
-    {
-        if (reg == 1)
-        {
-            ret = mcu.sr & sr_mask;
-        }
-        else if (reg == 3)
-        {
-            ret = mcu.br;
-        }
-        else if (reg == 4)
-        {
-            ret = mcu.ep;
-        }
-        else if (reg == 5)
-        {
-            ret = mcu.dp;
-        }
-        else if (reg == 7)
-        {
-            ret = mcu.tp;
-        }
-        else
-        {
-            MCU_ErrorTrap();
-        }
-        ret &= 0xff;
-    }
-    return ret;
-}
-
-void MCU::MCU_SetStatus(uint32_t condition, uint32_t mask)
-{
-    if (condition)
-        mcu.sr |= mask;
-    else
-        mcu.sr &= ~mask;
-}
-
-void MCU::MCU_PushStack(uint16_t data)
-{
-    if (mcu.r[7] & 1)
-        MCU_Interrupt_Exception(this, EXCEPTION_SOURCE_ADDRESS_ERROR);
-    mcu.r[7] -= 2;
-    MCU_Write16(mcu.r[7], data);
-}
-
-uint16_t MCU::MCU_PopStack(void)
-{
-    uint16_t ret;
-    if (mcu.r[7] & 1)
-        MCU_Interrupt_Exception(this, EXCEPTION_SOURCE_ADDRESS_ERROR);
-    ret = MCU_Read16(mcu.r[7]);
-    mcu.r[7] += 2;
-    return ret;
-}
 
 uint16_t MCU::MCU_AnalogReadPin(uint32_t pin)
 {
-    if (mcu_mk1)
-        return 0x0;
-    return 0x3ff;
+    if (mcu_cm300)
+        return 0;
+    if (mcu_jv880)
+    {
+        if (pin == 1)
+            return ANALOG_LEVEL_BATTERY;
+        return 0x3ff;
+    }
     uint8_t rcu;
     if (pin == 7)
     {
+        if (mcu_mk1)
+            return ANALOG_LEVEL_BATTERY;
         switch ((io_sd >> 2) & 3)
         {
         case 0: // Battery voltage
@@ -523,9 +377,7 @@ uint8_t MCU::MCU_DeviceRead(uint32_t address)
             midi_ready = true; // FIXME
         return dev_register[address];
     case DEV_TDR:
-        return dev_register[address];
     case DEV_SMR:
-        return dev_register[address];
     case DEV_IPRC:
     case DEV_IPRD:
     case DEV_DTEC:
@@ -584,6 +436,17 @@ void MCU::MCU_UpdateAnalog(uint64_t cycles)
         analog_end_time = 0;
 }
 
+mcu_t mcu;
+
+uint8_t rom1[ROM1_SIZE];
+uint8_t rom2[ROM2_SIZE];
+uint8_t ram[RAM_SIZE];
+uint8_t sram[SRAM_SIZE];
+uint8_t nvram[NVRAM_SIZE];
+uint8_t cardram[CARDRAM_SIZE];
+
+int rom2_mask = ROM2_SIZE - 1;
+
 uint8_t MCU::MCU_Read(uint32_t address)
 {
     uint32_t address_rom = address & 0x3ffff;
@@ -601,13 +464,14 @@ uint8_t MCU::MCU_Read(uint32_t address)
         {
             if (!mcu_mk1)
             {
-                if (mcu_jv880 ? (address >= 0xf000 && address < 0xf400) : (address >= 0xe000 && address < 0xe400))
+                uint16_t base = mcu_jv880 ? 0xf000 : 0xe000;
+                if (address >= base && address < (base | 0x400))
                 {
                     ret = pcm.PCM_Read(address & 0x3f);
                 }
                 else if (address >= 0xec00 && address < 0xf000)
                 {
-                    ret = sub_mcu.SM_SysRead(address & 0xff);
+                    ret = sub_mcu.SM_SysRead(this, address & 0xff);
                 }
                 else if (address >= 0xff80)
                 {
@@ -620,7 +484,7 @@ uint8_t MCU::MCU_Read(uint32_t address)
                 {
                     ret = sram[address & 0x7fff];
                 }
-                else if (mcu_jv880 ? (address == 0xf402) : (address == 0xe402))
+                else if (address == (base | 0x402))
                 {
                     ret = ga_int_trigger;
                     ga_int_trigger = 0;
@@ -706,16 +570,17 @@ uint8_t MCU::MCU_Read(uint32_t address)
         break;
 #endif
     case 1:
-        ret = rom2[address_rom & rom2_mask];
-        break;
     case 2:
-        ret = rom2[address_rom & rom2_mask];
-        break;
     case 3:
-        ret = rom2[address_rom & rom2_mask];
-        break;
     case 4:
         ret = rom2[address_rom & rom2_mask];
+        break;
+    case 10:
+    case 11:
+        if (!mcu_mk1)
+            ret = sram[address & 0x7fff]; // FIXME
+        else
+            ret = 0xff;
         break;
     case 8:
         if (!mcu_jv880)
@@ -736,9 +601,8 @@ uint8_t MCU::MCU_Read(uint32_t address)
         else
             ret = cardram[address & 0x7fff]; // FIXME
         break;
-    case 10:
-    case 11:
-        if (!mcu_mk1)
+    case 5:
+        if (mcu_mk1)
             ret = sram[address & 0x7fff]; // FIXME
         else
             ret = 0xff;
@@ -747,12 +611,6 @@ uint8_t MCU::MCU_Read(uint32_t address)
     case 13:
         if (mcu_jv880)
             ret = nvram[address & 0x7fff]; // FIXME
-        else
-            ret = 0xff;
-        break;
-    case 5:
-        if (mcu_mk1)
-            ret = sram[address & 0x7fff]; // FIXME
         else
             ret = 0xff;
         break;
@@ -972,6 +830,7 @@ void MCU::MCU_Reset(void)
     {
         ga_int_enable = 255;
     }
+    mcu_timer.TIMER_Reset(this);
 }
 
 void MCU::MCU_PostUART(uint8_t data)
@@ -1025,6 +884,9 @@ void MCU::MCU_PatchROM(void)
     //rom2[0x1334] = 0x19;
     //rom1[0x622d] = 0x19;
 }
+
+uint8_t mcu_p0_data = 0x00;
+uint8_t mcu_p1_data = 0x00;
 
 uint8_t MCU::MCU_ReadP0(void)
 {
@@ -1120,6 +982,16 @@ void MCU::MCU_EncoderTrigger(int dir)
     MCU_GA_SetGAInt(dir == 0 ? 3 : 4, 1);
 }
 
+
+static FILE *s_rf[rf_num] =
+{
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr
+};
+
 void MCU::closeAllR()
 {
     for(size_t i = 0; i < rf_num; ++i)
@@ -1130,12 +1002,20 @@ void MCU::closeAllR()
     }
 }
 
+enum class ResetType {
+    NONE,
+    GS_RESET,
+    GM_RESET,
+};
+
 MCU::MCU() : pcm(this), lcd(this), sub_mcu(this), mcu_timer(this) {}
 
 int MCU::startSC55(std::string *basePath)
 {
     if (init_lock == nullptr)
         init_lock = SDL_CreateMutex();
+    const unsigned char gmReset[] = { 0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7 };
+    const unsigned char gsReset[] = { 0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7 };
 
     romset = ROM_SET_JV880;
     autodetect = false;
@@ -1193,12 +1073,6 @@ int MCU::startSC55(std::string *basePath)
             rom2_mask /= 2; // rom is half the size
             lcd.lcd_width = 820;
             lcd.lcd_height = 100;
-            FILE *f = fopen("nvram.bin", "rb");
-            if (f)
-            {
-                fread(nvram, NVRAM_SIZE, 1, f);
-                fclose(f);
-            }
             break;
     }
 
@@ -1217,7 +1091,8 @@ int MCU::startSC55(std::string *basePath)
     for(size_t i = 0; i < 5; ++i)
     {
         s_rf[i] = Files::utf8_fopen(rpaths[i].c_str(), "rb");
-        r_ok &= (s_rf[i] != nullptr);
+        bool optional = mcu_jv880 && i == 4;
+        r_ok &= optional || (s_rf[i] != nullptr);
         if(!s_rf[i])
         {
             if(!errors_list.empty())
@@ -1316,15 +1191,10 @@ int MCU::startSC55(std::string *basePath)
 
         unscramble(tempbuf, pcm.waverom2, 0x200000);
 
-        if (fread(tempbuf, 1, 0x800000, s_rf[4]) != 0x800000)
-        {
-            fprintf(stderr, "FATAL ERROR: Failed to read the WaveRom EXP.\n");
-            fflush(stderr);
-            closeAllR();
-            return 1;
-        }
-
-        unscramble(tempbuf, pcm.waverom_exp, 0x800000);
+        if (s_rf[4] && fread(tempbuf, 1, 0x800000, s_rf[4]))
+            unscramble(tempbuf, pcm.waverom_exp, 0x800000);
+        else
+            printf("WaveRom EXP not found, skipping it.\n");
     }
     else
     {
@@ -1410,8 +1280,6 @@ int MCU::updateSC55(int16_t *data, unsigned int dataSize) {
 
     SDL_LockMutex(init_lock);
 
-    // auto start = std::chrono::high_resolution_clock::now();
-
     dataSize /= 2;
 
     if (audio_buffer_size < dataSize) {
@@ -1461,13 +1329,6 @@ int MCU::updateSC55(int16_t *data, unsigned int dataSize) {
     }
 
     memcpy(data, sample_buffer, dataSize * 2);
-
-    // auto stop = std::chrono::high_resolution_clock::now();
-    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-    // if (duration > 8) {
-    //     printf("updateSC55 took %lld ms\n", duration);
-    //     fflush(stdout);
-    // }
 
     SDL_UnlockMutex(init_lock);
 

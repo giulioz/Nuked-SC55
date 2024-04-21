@@ -65,7 +65,7 @@ struct MCU_Timer {
     frt_t frt[3];
     mcu_timer_t timer;
 
-    void TIMER_Reset(void);
+    void TIMER_Reset(MCU* mcu);
     void TIMER_Write(uint32_t address, uint8_t data);
     uint8_t TIMER_Read(uint32_t address);
     void TIMER_Clock(uint64_t cycles);

@@ -154,45 +154,45 @@ void LCD::LCD_Write(uint32_t address, uint8_t data)
 
 const int button_map_sc55[][2] =
 {
-    SDL_SCANCODE_Q, MCU_BUTTON_POWER,
-    SDL_SCANCODE_W, MCU_BUTTON_INST_ALL,
-    SDL_SCANCODE_E, MCU_BUTTON_INST_MUTE,
-    SDL_SCANCODE_R, MCU_BUTTON_PART_L,
-    SDL_SCANCODE_T, MCU_BUTTON_PART_R,
-    SDL_SCANCODE_Y, MCU_BUTTON_INST_L,
-    SDL_SCANCODE_U, MCU_BUTTON_INST_R,
-    SDL_SCANCODE_I, MCU_BUTTON_KEY_SHIFT_L,
-    SDL_SCANCODE_O, MCU_BUTTON_KEY_SHIFT_R,
-    SDL_SCANCODE_P, MCU_BUTTON_LEVEL_L,
-    SDL_SCANCODE_LEFTBRACKET, MCU_BUTTON_LEVEL_R,
-    SDL_SCANCODE_A, MCU_BUTTON_MIDI_CH_L,
-    SDL_SCANCODE_S, MCU_BUTTON_MIDI_CH_R,
-    SDL_SCANCODE_D, MCU_BUTTON_PAN_L,
-    SDL_SCANCODE_F, MCU_BUTTON_PAN_R,
-    SDL_SCANCODE_G, MCU_BUTTON_REVERB_L,
-    SDL_SCANCODE_H, MCU_BUTTON_REVERB_R,
-    SDL_SCANCODE_J, MCU_BUTTON_CHORUS_L,
-    SDL_SCANCODE_K, MCU_BUTTON_CHORUS_R,
-    SDL_SCANCODE_LEFT, MCU_BUTTON_PART_L,
-    SDL_SCANCODE_RIGHT, MCU_BUTTON_PART_R,
+    {SDL_SCANCODE_Q, MCU_BUTTON_POWER},
+    {SDL_SCANCODE_W, MCU_BUTTON_INST_ALL},
+    {SDL_SCANCODE_E, MCU_BUTTON_INST_MUTE},
+    {SDL_SCANCODE_R, MCU_BUTTON_PART_L},
+    {SDL_SCANCODE_T, MCU_BUTTON_PART_R},
+    {SDL_SCANCODE_Y, MCU_BUTTON_INST_L},
+    {SDL_SCANCODE_U, MCU_BUTTON_INST_R},
+    {SDL_SCANCODE_I, MCU_BUTTON_KEY_SHIFT_L},
+    {SDL_SCANCODE_O, MCU_BUTTON_KEY_SHIFT_R},
+    {SDL_SCANCODE_P, MCU_BUTTON_LEVEL_L},
+    {SDL_SCANCODE_LEFTBRACKET, MCU_BUTTON_LEVEL_R},
+    {SDL_SCANCODE_A, MCU_BUTTON_MIDI_CH_L},
+    {SDL_SCANCODE_S, MCU_BUTTON_MIDI_CH_R},
+    {SDL_SCANCODE_D, MCU_BUTTON_PAN_L},
+    {SDL_SCANCODE_F, MCU_BUTTON_PAN_R},
+    {SDL_SCANCODE_G, MCU_BUTTON_REVERB_L},
+    {SDL_SCANCODE_H, MCU_BUTTON_REVERB_R},
+    {SDL_SCANCODE_J, MCU_BUTTON_CHORUS_L},
+    {SDL_SCANCODE_K, MCU_BUTTON_CHORUS_R},
+    {SDL_SCANCODE_LEFT, MCU_BUTTON_PART_L},
+    {SDL_SCANCODE_RIGHT, MCU_BUTTON_PART_R}
 };
 
 const int button_map_jv880[][2] =
 {
-    SDL_SCANCODE_P, MCU_BUTTON_PREVIEW,
-    SDL_SCANCODE_LEFT, MCU_BUTTON_CURSOR_L,
-    SDL_SCANCODE_RIGHT, MCU_BUTTON_CURSOR_R,
-    SDL_SCANCODE_TAB, MCU_BUTTON_DATA,
-    SDL_SCANCODE_Q, MCU_BUTTON_TONE_SELECT,
-    SDL_SCANCODE_A, MCU_BUTTON_PATCH_PERFORM,
-    SDL_SCANCODE_W, MCU_BUTTON_EDIT,
-    SDL_SCANCODE_E, MCU_BUTTON_SYSTEM,
-    SDL_SCANCODE_R, MCU_BUTTON_RHYTHM,
-    SDL_SCANCODE_T, MCU_BUTTON_UTILITY,
-    SDL_SCANCODE_S, MCU_BUTTON_MUTE,
-    SDL_SCANCODE_D, MCU_BUTTON_MONITOR,
-    SDL_SCANCODE_F, MCU_BUTTON_COMPARE,
-    SDL_SCANCODE_G, MCU_BUTTON_ENTER,
+    {SDL_SCANCODE_P, MCU_BUTTON_PREVIEW},
+    {SDL_SCANCODE_LEFT, MCU_BUTTON_CURSOR_L},
+    {SDL_SCANCODE_RIGHT, MCU_BUTTON_CURSOR_R},
+    {SDL_SCANCODE_TAB, MCU_BUTTON_DATA},
+    {SDL_SCANCODE_Q, MCU_BUTTON_TONE_SELECT},
+    {SDL_SCANCODE_A, MCU_BUTTON_PATCH_PERFORM},
+    {SDL_SCANCODE_W, MCU_BUTTON_EDIT},
+    {SDL_SCANCODE_E, MCU_BUTTON_SYSTEM},
+    {SDL_SCANCODE_R, MCU_BUTTON_RHYTHM},
+    {SDL_SCANCODE_T, MCU_BUTTON_UTILITY},
+    {SDL_SCANCODE_S, MCU_BUTTON_MUTE},
+    {SDL_SCANCODE_D, MCU_BUTTON_MONITOR},
+    {SDL_SCANCODE_F, MCU_BUTTON_COMPARE},
+    {SDL_SCANCODE_G, MCU_BUTTON_ENTER}
 };
 
 
@@ -217,8 +217,14 @@ void LCD::LCD_Init()
 
 const uint32_t lcd_col1 = 0x000000;
 const uint32_t lcd_col2 = 0x0050c8;
+void LCD::LCD_UnInit(void)
+{
+    if(!lcd_init)
+        return;
+}
 
-void LCD::LCD_FontRenderStandard(int32_t x, int32_t y, uint8_t ch)
+
+void LCD::LCD_FontRenderStandard(int32_t x, int32_t y, uint8_t ch, bool overlay)
 {
     uint8_t* f;
     if (ch >= 16)
@@ -244,7 +250,10 @@ void LCD::LCD_FontRenderStandard(int32_t x, int32_t y, uint8_t ch)
             {
                 for (int jj = 0; jj < 5; jj++)
                 {
-                    lcd_buffer[xx+ii][yy+jj] = col;
+                    if (overlay)
+                        lcd_buffer[xx+ii][yy+jj] &= col;
+                    else
+                        lcd_buffer[xx+ii][yy+jj] = col;
                 }
             }
         }
@@ -279,6 +288,68 @@ void LCD::LCD_FontRenderLevel(int32_t x, int32_t y, uint8_t ch, uint8_t width)
                 {
                     lcd_buffer[xx+ii][yy+jj] = col;
                 }
+            }
+        }
+    }
+}
+
+static const uint8_t LR[2][12][11] =
+{
+    {
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1},
+    },
+    {
+        {1,1,1,1,1,1,1,1,1,0,0},
+        {1,1,1,1,1,1,1,1,1,1,0},
+        {1,1,0,0,0,0,0,0,1,1,0},
+        {1,1,0,0,0,0,0,0,1,1,0},
+        {1,1,0,0,0,0,0,0,1,1,0},
+        {1,1,1,1,1,1,1,1,1,1,0},
+        {1,1,1,1,1,1,1,1,1,0,0},
+        {1,1,0,0,0,0,0,1,1,0,0},
+        {1,1,0,0,0,0,0,0,1,1,0},
+        {1,1,0,0,0,0,0,0,1,1,0},
+        {1,1,0,0,0,0,0,0,0,1,1},
+        {1,1,0,0,0,0,0,0,0,1,1},
+    }
+};
+
+
+void LCD::LCD_FontRenderLR(uint8_t ch)
+{
+    uint8_t* f;
+    if (ch >= 16)
+        f = &lcd_font[ch - 16][0];
+    else
+        f = &LCD_CG[(ch & 7) * 8];
+    int col;
+    if (f[0] & 1)
+    {
+        col = lcd_col1;
+    }
+    else
+    {
+        col = lcd_col2;
+    }
+    for (int f = 0; f < 2; f++)
+    {
+        for (int i = 0; i < 12; i++)
+        {
+            for (int j = 0; j < 11; j++)
+            {
+                if (LR[f][i][j])
+                    lcd_buffer[i+LR_xy[f][0]][j+LR_xy[f][1]] = col;
             }
         }
     }
@@ -326,6 +397,12 @@ uint32_t* LCD::LCD_Update(void)
                         LCD_FontRenderStandard(4 + i * 50, 4 + j * 34, ch);
                     }
                 }
+
+                // cursor
+                int j = LCD_DD_RAM % 0x40;
+                int i = LCD_DD_RAM / 0x40;
+                if (i < 2 && j < 24 && LCD_C)
+                    LCD_FontRenderStandard(4 + i * 50, 4 + j * 34, '_', true);
             }
             else
             {
@@ -369,6 +446,8 @@ uint32_t* LCD::LCD_Update(void)
                     uint8_t ch = LCD_Data[55 + i];
                     LCD_FontRenderStandard(203, 153 + i * 35, ch);
                 }
+
+                LCD_FontRenderLR(LCD_Data[58]);
 
                 for (int i = 0; i < 2; i++)
                 {
