@@ -87,7 +87,7 @@ struct SubMcu {
     uint8_t SM_Read(uint16_t address);
     void SM_Write(uint16_t address, uint8_t data);
     void SM_SysWrite(uint32_t address, uint8_t data);
-    uint8_t SM_SysRead(uint32_t address);
+    uint8_t SM_SysRead(MCU *mcu, uint32_t address);
     uint16_t SM_GetVectorAddress(uint32_t vector);
     void SM_SetStatus(uint32_t condition, uint32_t mask);
     void SM_Reset(void);

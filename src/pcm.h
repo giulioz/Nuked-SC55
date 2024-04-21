@@ -50,8 +50,6 @@ struct pcm_t {
     uint32_t irq_channel;
     uint32_t irq_assert;
 
-    uint32_t nfs;
-
     uint32_t tv_counter;
 
     uint64_t cycles;
@@ -75,9 +73,42 @@ struct Pcm {
     uint8_t waverom3[0x100000];
     uint8_t waverom_exp[0x800000];
 
+    inline void calc_tv(int e, int adjust, uint16_t *levelcur, int active, int *volmul);
     void PCM_Write(uint32_t address, uint8_t data);
     uint8_t PCM_Read(uint32_t address);
     void PCM_Reset(void);
     void PCM_Update(uint64_t cycles);
     uint8_t PCM_ReadROM(uint32_t address);
+
+    inline int eram_unpack(int addr, int type = 0)
+    {
+        addr &= 0x3fff;
+        int data = pcm.eram[addr];
+        int val = data & 0x3fff;
+        int sh = (data >> 14) & 3;
+    
+        val <<= 18;
+        return val >> (18 - sh * 2 + type);
+    };
+
+    inline void eram_pack(int addr, int val)
+    {
+        addr &= 0x3fff;
+        int sh = 0;
+        int top = (val >> 13) & 0x7f;
+        if (top & 0x40)
+            top ^= 0x7f;
+        if (top >= 16)
+            sh = 3;
+        else if (top >= 4)
+            sh = 2;
+        else if (top >= 1)
+            sh = 1;
+        else
+            sh = 0;
+
+        int data = (val >> (sh * 2)) & 0x3fff;
+        data |= sh << 14;
+        pcm.eram[addr] = data;
+};
 };

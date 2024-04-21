@@ -35,7 +35,7 @@
 #include "mcu.h"
 #include "mcu_interrupt.h"
 
-void MCU_Interrupt_Start(MCU* mcu, int32_t mask)
+inline void MCU_Interrupt_Start(MCU* mcu, int32_t mask)
 {
     mcu->MCU_PushStack(mcu->mcu.pc);
     mcu->MCU_PushStack(mcu->mcu.cp);
@@ -52,6 +52,7 @@ void MCU_Interrupt_Start(MCU* mcu, int32_t mask)
 void MCU_Interrupt_SetRequest(MCU* mcu, uint32_t interrupt, uint32_t value)
 {
     mcu->mcu.interrupt_pending[interrupt] = value;
+    mcu->mcu.pending_interrupts += value > 0 ? 1 : -1;
 }
 
 void MCU_Interrupt_Exception(MCU* mcu, uint32_t exception)
@@ -68,9 +69,10 @@ void MCU_Interrupt_Exception(MCU* mcu, uint32_t exception)
 void MCU_Interrupt_TRAPA(MCU* mcu, uint32_t vector)
 {
     mcu->mcu.trapa_pending[vector] = 1;
+    mcu->mcu.pending_trapas++;
 }
 
-void MCU_Interrupt_StartVector(MCU* mcu, uint32_t vector, int32_t mask)
+inline void MCU_Interrupt_StartVector(MCU* mcu, uint32_t vector, int32_t mask)
 {
     uint32_t address = mcu->MCU_GetVectorAddress(vector);
     MCU_Interrupt_Start(mcu, mask);
@@ -81,49 +83,49 @@ void MCU_Interrupt_StartVector(MCU* mcu, uint32_t vector, int32_t mask)
 void MCU_Interrupt_Handle(MCU* mcu)
 {
 #if 0
-    if (mcu->mcu.cycles % 2000 == 0 && mcu->mcu.sleep)
+    if (mcu->cycles % 2000 == 0 && mcu->mcu.sleep)
     {
         MCU_Interrupt_StartVector(mcu, VECTOR_INTERNAL_INTERRUPT_94);
         return;
     }
-    if (mcu->mcu.cycles % 2000 == 1000 && mcu->mcu.sleep)
+    if (mcu->cycles % 2000 == 1000 && mcu->mcu.sleep)
     {
         MCU_Interrupt_StartVector(mcu, VECTOR_INTERNAL_INTERRUPT_A4);
         return;
     }
-    if (mcu->mcu.cycles % 2000 == 1500 && mcu->mcu.sleep)
+    if (mcu->cycles % 2000 == 1500 && mcu->mcu.sleep)
     {
         MCU_Interrupt_StartVector(mcu, VECTOR_INTERNAL_INTERRUPT_B4);
         return;
     }
 #endif
     uint32_t i;
-    for (i = 0; i < 16; i++)
-    {
-        if (mcu->mcu.trapa_pending[i])
+    if (mcu->mcu.pending_trapas) {
+        for (i = 0; i < 16; i++)
         {
-            mcu->mcu.trapa_pending[i] = 0;
-            MCU_Interrupt_StartVector(mcu, VECTOR_TRAPA_0 + i, -1);
-            return;
+            if (mcu->mcu.trapa_pending[i])
+            {
+                mcu->mcu.trapa_pending[i] = 0;
+                mcu->mcu.pending_trapas--;
+                MCU_Interrupt_StartVector(mcu, VECTOR_TRAPA_0 + i, -1);
+                return;
+            }
         }
     }
-    if (mcu->mcu.exception_pending >= 0)
+    switch (mcu->mcu.exception_pending)
     {
-        switch (mcu->mcu.exception_pending)
-        {
-            case EXCEPTION_SOURCE_ADDRESS_ERROR:
-                MCU_Interrupt_StartVector(mcu, VECTOR_ADDRESS_ERROR, -1);
-                break;
-            case EXCEPTION_SOURCE_INVALID_INSTRUCTION:
-                MCU_Interrupt_StartVector(mcu, VECTOR_INVALID_INSTRUCTION, -1);
-                break;
-            case EXCEPTION_SOURCE_TRACE:
-                MCU_Interrupt_StartVector(mcu, VECTOR_TRACE, -1);
-                break;
-
-        }
-        mcu->mcu.exception_pending = -1;
-        return;
+        case EXCEPTION_SOURCE_ADDRESS_ERROR:
+            MCU_Interrupt_StartVector(mcu, VECTOR_ADDRESS_ERROR, -1);
+            mcu->mcu.exception_pending = -1;
+            return;
+        case EXCEPTION_SOURCE_INVALID_INSTRUCTION:
+            MCU_Interrupt_StartVector(mcu, VECTOR_INVALID_INSTRUCTION, -1);
+            mcu->mcu.exception_pending = -1;
+            return;
+        case EXCEPTION_SOURCE_TRACE:
+            MCU_Interrupt_StartVector(mcu, VECTOR_TRACE, -1);
+            mcu->mcu.exception_pending = -1;
+            return;
     }
     if (mcu->mcu.interrupt_pending[INTERRUPT_SOURCE_NMI])
     {
@@ -131,6 +133,9 @@ void MCU_Interrupt_Handle(MCU* mcu)
         MCU_Interrupt_StartVector(mcu, VECTOR_NMI, 7);
         return;
     }
+
+    if (!mcu->mcu.pending_interrupts) return;
+
     uint32_t mask = (mcu->mcu.sr >> 8) & 7;
     for (i = INTERRUPT_SOURCE_NMI + 1; i < INTERRUPT_SOURCE_MAX; i++)
     {
