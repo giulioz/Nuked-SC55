@@ -212,7 +212,7 @@ void LCD::LCD_Init()
 
     std::string title = "Nuked SC-55: ";
 
-    title += rs_name[romset];
+    title += rs_name[mcu->romset];
 
     window = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, lcd_width, lcd_height, SDL_WINDOW_SHOWN);
     if (!window)
@@ -237,7 +237,7 @@ void LCD::LCD_Init()
     lcd_init = true;
 }
 
-void LCD_UnInit(void)
+void LCD::LCD_UnInit(void)
 {
     if(!lcd_init)
         return;
@@ -389,7 +389,7 @@ uint32_t* LCD::LCD_Update(void)
 
     if (!mcu->mcu_cm300 && !mcu->mcu_st)
     {
-        MCU_WorkThread_Lock();
+        mcu->MCU_WorkThread_Lock();
 
         if (!lcd_enable && !mcu->mcu_jv880)
         {
@@ -487,7 +487,7 @@ uint32_t* LCD::LCD_Update(void)
             }
         }
 
-        MCU_WorkThread_Unlock();
+        mcu->MCU_WorkThread_Unlock();
 
         SDL_UpdateTexture(texture, NULL, lcd_buffer, lcd_width_max * 4);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
@@ -500,9 +500,9 @@ uint32_t* LCD::LCD_Update(void)
         if (sdl_event.type == SDL_KEYDOWN)
         {
             if (sdl_event.key.keysym.scancode == SDL_SCANCODE_COMMA)
-                MCU_EncoderTrigger(0);
+                mcu->MCU_EncoderTrigger(0);
             if (sdl_event.key.keysym.scancode == SDL_SCANCODE_PERIOD)
-                MCU_EncoderTrigger(1);
+                mcu->MCU_EncoderTrigger(1);
         }
 
         switch (sdl_event.type)
@@ -518,10 +518,10 @@ uint32_t* LCD::LCD_Update(void)
                     continue;
                 
                 int mask = 0;
-                uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
+                uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu->mcu_button_pressed);
 
-                auto button_map = mcu_jv880 ? button_map_jv880 : button_map_sc55;
-                auto button_size = (mcu_jv880 ? sizeof(button_map_jv880) : sizeof(button_map_sc55)) / sizeof(button_map_sc55[0]);
+                auto button_map = mcu->mcu_jv880 ? button_map_jv880 : button_map_sc55;
+                auto button_size = (mcu->mcu_jv880 ? sizeof(button_map_jv880) : sizeof(button_map_sc55)) / sizeof(button_map_sc55[0]);
                 for (size_t i = 0; i < button_size; i++)
                 {
                     if (button_map[i][0] == sdl_event.key.keysym.scancode)
@@ -533,7 +533,7 @@ uint32_t* LCD::LCD_Update(void)
                 else
                     button_pressed &= ~mask;
 
-                SDL_AtomicSet(&mcu_button_pressed, (int)button_pressed);
+                SDL_AtomicSet(&mcu->mcu_button_pressed, (int)button_pressed);
 
 #if 0
                 if (sdl_event.key.keysym.scancode >= SDL_SCANCODE_1 && sdl_event.key.keysym.scancode < SDL_SCANCODE_0)

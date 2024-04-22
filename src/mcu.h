@@ -246,6 +246,12 @@ enum {
     ROM_SET_COUNT
 };
 
+enum class ResetType {
+    NONE,
+    GS_RESET,
+    GM_RESET,
+};
+
 extern const char* rs_name[ROM_SET_COUNT];
 
 static const int ROM1_SIZE = 0x8000;
@@ -289,7 +295,7 @@ struct MCU {
 
     int audio_buffer_size;
     int audio_page_size;
-    short *sample_buffer;
+    int *sample_buffer;
 
     int sample_read_ptr;
     int sample_write_ptr;
@@ -373,10 +379,13 @@ struct MCU {
     void MCU_PostUART(uint8_t data);
     void MCU_EncoderTrigger(int dir);
 
-    int startSC55(std::string *basepath);
-    int updateSC55(int16_t *data, unsigned int dataSize);
-    void postMidiSC55(uint8_t* message, int length);
-    void SC55_Reset();
+    void MCU_WorkThread_Lock(void);
+    void MCU_WorkThread_Unlock(void);
+
+    int startSC55(int argc, char *argv[]);
+    int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum);
+    void MCU_CloseAudio(void);
+    void MIDI_Reset(ResetType resetType);
 
     uint8_t RCU_Read(void);
     uint16_t MCU_AnalogReadPin(uint32_t pin);
