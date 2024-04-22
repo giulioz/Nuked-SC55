@@ -35,7 +35,6 @@
 
 #include <stdint.h>
 #include <string>
-#include "SDL.h"
 
 struct MCU;
 

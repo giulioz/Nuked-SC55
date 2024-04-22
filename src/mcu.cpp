@@ -1245,8 +1245,6 @@ int MCU::startSC55(std::string *basePath)
         return 1;
     }
 
-    uint8_t* tempbuf = (uint8_t*)malloc(0x800000);
-
     if (mcu_mk1)
     {
         if (fread(tempbuf, 1, 0x100000, s_rf[2]) != 0x100000)
@@ -1350,39 +1348,8 @@ int MCU::startSC55(std::string *basePath)
     pcm.PCM_Reset();
     mcu_timer.TIMER_Reset();
 
-    for (int i = 0; i < 1024 * 4; i++) {
-        if (!mcu.ex_ignore)
-            MCU_Interrupt_Handle(this);
-        else
-            mcu.ex_ignore = 0;
-
-        if (!mcu.sleep)
-            MCU_ReadInstruction();
-
-        mcu.cycles += 12; // FIXME: assume 12 cycles per instruction
-
-        // if (mcu.cycles % 24000000 == 0)
-        //     printf("seconds: %i\n", (int)(mcu.cycles / 24000000));
-
-        pcm.PCM_Update(mcu.cycles);
-
-        mcu_timer.TIMER_Clock(mcu.cycles);
-
-        if (!mcu_mk1 && !mcu_jv880)
-            sub_mcu.SM_Update(mcu.cycles);
-        else
-        {
-            MCU_UpdateUART_RX();
-            MCU_UpdateUART_TX();
-        }
-
-        MCU_UpdateAnalog(mcu.cycles);
-    }
-
     sample_write_ptr = 0;
 
-    free(tempbuf);
-    
     return 0;
 }
 
@@ -1408,6 +1375,11 @@ int MCU::updateSC55(int32_t *data, unsigned int dataSize) {
             fflush(stdout);
             break;
         }
+
+        if (pcm.pcm.config_reg_3c & 0x40)
+            sample_write_ptr &= ~3;
+        else
+            sample_write_ptr &= ~1;
 
         if (!mcu.ex_ignore)
             MCU_Interrupt_Handle(this);
