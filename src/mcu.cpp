@@ -982,7 +982,6 @@ void MCU::MCU_Reset(void)
 
 void MCU::MCU_PostUART(uint8_t data)
 {
-    printf("MCU_PostUART %x ready:%d write:%d ssr:%x\n", data, midi_ready, uart_write_ptr, dev_register[DEV_SSR]);
     if (!midi_ready) return;
     uart_buffer[uart_write_ptr] = data;
     uart_write_ptr = (uart_write_ptr + 1) % uart_buffer_size;
