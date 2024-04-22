@@ -34,8 +34,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
-#define SDL_MAIN_HANDLED
-#include "SDL.h"
 #include "mcu.h"
 #include "mcu_opcodes.h"
 #include "mcu_interrupt.h"
@@ -499,7 +497,7 @@ uint8_t MCU::MCU_DeviceRead(uint32_t address)
         if (!mcu_jv880) return 0xff;
 
         uint8_t data = 0xff;
-        uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
+        uint32_t button_pressed = mcu_button_pressed;
 
         if (io_sd == 0b11111011)
             data &= ((button_pressed >> 0) & 0b11111) ^ 0xFF;
@@ -670,7 +668,7 @@ uint8_t MCU::MCU_Read(uint32_t address)
                     lcd.LCD_Enable((io_sd & 8) != 0);
 
                     uint8_t data = 0xff;
-                    uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
+                    uint32_t button_pressed = mcu_button_pressed;
 
                     if ((io_sd & 1) == 0)
                         data &= 0x80 | (((button_pressed >> 0) & 127) ^ 127);
@@ -1039,7 +1037,7 @@ uint8_t MCU::MCU_ReadP0(void)
 uint8_t MCU::MCU_ReadP1(void)
 {
     uint8_t data = 0xff;
-    uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
+    uint32_t button_pressed = mcu_button_pressed;
 
     if ((mcu_p0_data & 1) == 0)
         data &= 0x80 | (((button_pressed >> 0) & 127) ^ 127);
@@ -1129,13 +1127,8 @@ MCU::MCU() : pcm(this), lcd(this), sub_mcu(this), mcu_timer(this) {}
 
 int MCU::startSC55(std::string *basePath)
 {
-    if (init_lock == nullptr)
-        init_lock = SDL_CreateMutex();
-
     romset = ROM_SET_JV880;
     autodetect = false;
-
-    SDL_LockMutex(init_lock);
 
     uint8_t* tempbuf = (uint8_t*) malloc(0x800000);
 
@@ -1388,17 +1381,11 @@ int MCU::startSC55(std::string *basePath)
     sample_write_ptr = 0;
 
     free(tempbuf);
-    SDL_UnlockMutex(init_lock);
     
     return 0;
 }
 
 int MCU::updateSC55(int16_t *data, unsigned int dataSize) {
-    if (init_lock == nullptr)
-        init_lock = SDL_CreateMutex();
-
-    SDL_LockMutex(init_lock);
-
     // auto start = std::chrono::high_resolution_clock::now();
 
     dataSize /= 2;
@@ -1457,8 +1444,6 @@ int MCU::updateSC55(int16_t *data, unsigned int dataSize) {
     //     printf("updateSC55 took %lld ms\n", duration);
     //     fflush(stdout);
     // }
-
-    SDL_UnlockMutex(init_lock);
 
     return 0;
 }

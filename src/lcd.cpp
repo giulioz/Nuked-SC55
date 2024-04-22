@@ -35,8 +35,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "SDL.h"
-#include "SDL_mutex.h"
 #include "lcd.h"
 #include "lcd_font.h"
 #include "mcu.h"
@@ -151,50 +149,6 @@ void LCD::LCD_Write(uint32_t address, uint8_t data)
     //else
     //    printf("\n");
 }
-
-const int button_map_sc55[][2] =
-{
-    SDL_SCANCODE_Q, MCU_BUTTON_POWER,
-    SDL_SCANCODE_W, MCU_BUTTON_INST_ALL,
-    SDL_SCANCODE_E, MCU_BUTTON_INST_MUTE,
-    SDL_SCANCODE_R, MCU_BUTTON_PART_L,
-    SDL_SCANCODE_T, MCU_BUTTON_PART_R,
-    SDL_SCANCODE_Y, MCU_BUTTON_INST_L,
-    SDL_SCANCODE_U, MCU_BUTTON_INST_R,
-    SDL_SCANCODE_I, MCU_BUTTON_KEY_SHIFT_L,
-    SDL_SCANCODE_O, MCU_BUTTON_KEY_SHIFT_R,
-    SDL_SCANCODE_P, MCU_BUTTON_LEVEL_L,
-    SDL_SCANCODE_LEFTBRACKET, MCU_BUTTON_LEVEL_R,
-    SDL_SCANCODE_A, MCU_BUTTON_MIDI_CH_L,
-    SDL_SCANCODE_S, MCU_BUTTON_MIDI_CH_R,
-    SDL_SCANCODE_D, MCU_BUTTON_PAN_L,
-    SDL_SCANCODE_F, MCU_BUTTON_PAN_R,
-    SDL_SCANCODE_G, MCU_BUTTON_REVERB_L,
-    SDL_SCANCODE_H, MCU_BUTTON_REVERB_R,
-    SDL_SCANCODE_J, MCU_BUTTON_CHORUS_L,
-    SDL_SCANCODE_K, MCU_BUTTON_CHORUS_R,
-    SDL_SCANCODE_LEFT, MCU_BUTTON_PART_L,
-    SDL_SCANCODE_RIGHT, MCU_BUTTON_PART_R,
-};
-
-const int button_map_jv880[][2] =
-{
-    SDL_SCANCODE_P, MCU_BUTTON_PREVIEW,
-    SDL_SCANCODE_LEFT, MCU_BUTTON_CURSOR_L,
-    SDL_SCANCODE_RIGHT, MCU_BUTTON_CURSOR_R,
-    SDL_SCANCODE_TAB, MCU_BUTTON_DATA,
-    SDL_SCANCODE_Q, MCU_BUTTON_TONE_SELECT,
-    SDL_SCANCODE_A, MCU_BUTTON_PATCH_PERFORM,
-    SDL_SCANCODE_W, MCU_BUTTON_EDIT,
-    SDL_SCANCODE_E, MCU_BUTTON_SYSTEM,
-    SDL_SCANCODE_R, MCU_BUTTON_RHYTHM,
-    SDL_SCANCODE_T, MCU_BUTTON_UTILITY,
-    SDL_SCANCODE_S, MCU_BUTTON_MUTE,
-    SDL_SCANCODE_D, MCU_BUTTON_MONITOR,
-    SDL_SCANCODE_F, MCU_BUTTON_COMPARE,
-    SDL_SCANCODE_G, MCU_BUTTON_ENTER,
-};
-
 
 void LCD::LCD_SetBackPath(const std::string &path)
 {
@@ -466,13 +420,13 @@ uint32_t* LCD::LCD_Update(void)
 }
 
 void LCD::LCD_SendButton(uint8_t button, int state) {
-    uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu->mcu_button_pressed);
+    uint32_t button_pressed = mcu->mcu_button_pressed;
     int mask = (1 << button);
     if (state) {
         button_pressed |= mask;
     } else {
         button_pressed &= ~mask;
     }
-    SDL_AtomicSet(&mcu->mcu_button_pressed, (int)button_pressed);
+    mcu->mcu_button_pressed = button_pressed;
 }
 

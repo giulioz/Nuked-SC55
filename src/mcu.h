@@ -36,8 +36,6 @@
 #include <stdint.h>
 #include <vector>
 #include "mcu_interrupt.h"
-#include <SDL2/SDL_atomic.h>
-#include "SDL.h"
 #include "pcm.h"
 #include "lcd.h"
 #include "mcu_timer.h"
@@ -277,7 +275,7 @@ struct MCU {
     int mcu_st = 0; // 0 - SC-55mk2, 1 - SC-55ST
     int mcu_jv880 = 0; // 0 - SC-55, 1 - JV880
 
-    SDL_atomic_t mcu_button_pressed = {0};
+    uint32_t mcu_button_pressed;
 
     uint8_t mcu_p0_data = 0x00;
     uint8_t mcu_p1_data = 0x00;
@@ -331,8 +329,6 @@ struct MCU {
     uint8_t operand_status;
     uint16_t operand_data;
     uint8_t opcode_extended;
-
-    SDL_mutex *init_lock;
 
     FILE *s_rf[rf_num] =
     {

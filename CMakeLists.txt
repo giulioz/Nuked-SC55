@@ -25,22 +25,6 @@ set(CMAKE_CXX_FLAGS "-O3 -g")
 
 #===========================================================================================
 
-function(nuked-sc55_find_SDL2)
-    if(NOT TARGET ADLMIDI_SDL2)
-        find_package(SDL2 REQUIRED)
-        add_library(ADLMIDI_SDL2 INTERFACE)
-        if(TARGET SDL2::SDL2)
-            target_link_libraries(ADLMIDI_SDL2 INTERFACE SDL2::SDL2)
-        else()
-            string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
-            target_include_directories(ADLMIDI_SDL2 INTERFACE ${SDL2_INCLUDE_DIRS})
-            target_link_libraries(ADLMIDI_SDL2 INTERFACE ${SDL2_LIBRARIES})
-        endif()
-    endif()
-endfunction()
-
-#===========================================================================================
-
 if(NOT WIN32)
     check_function_exists(fstatat FILES_HAS_REALPATH)
     if(FILES_HAS_REALPATH)
@@ -49,8 +33,6 @@ if(NOT WIN32)
 endif()
 
 include(3rdparty/Utf8Main/utf8main.cmake)
-
-find_package(SDL2 REQUIRED)
 
 set(SC55_SRC
     src/mcu.cpp src/mcu.h # main() is here!
@@ -65,14 +47,6 @@ set(SC55_SRC
 )
 
 add_library(nuked-sc55 STATIC ${SC55_SRC} ${UTF8MAIN_SRCS})
-
-if(TARGET SDL2::SDL2)
-    target_link_libraries(nuked-sc55 PRIVATE SDL2::SDL2)
-else()
-    string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
-    target_include_directories(nuked-sc55 PRIVATE ${SDL2_INCLUDE_DIRS})
-    target_link_libraries(nuked-sc55 PRIVATE ${SDL2_LIBRARIES})
-endif()
 
 set(SC55_INSTALL_FILES)
 

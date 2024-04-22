@@ -12,6 +12,7 @@
 		5E0B43B82BC45C3C0028D51B /* jv880_rom1.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E0B43B42BC45C3C0028D51B /* jv880_rom1.bin */; };
 		5E0B43B92BC45C3C0028D51B /* jv880_waverom2.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E0B43B52BC45C3C0028D51B /* jv880_waverom2.bin */; };
 		5E0B43BA2BC45C3C0028D51B /* jv880_rom2.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E0B43B62BC45C3C0028D51B /* jv880_rom2.bin */; };
+		5E2CB6C02BD5B69C0079B9B1 /* jv880_waverom_expansion.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E2CB6BF2BD5B69C0079B9B1 /* jv880_waverom_expansion.bin */; };
 		5E8415512BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN in Resources */ = {isa = PBXBuildFile; fileRef = 5E8415502BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN */; };
 		5E8415532BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN in Resources */ = {isa = PBXBuildFile; fileRef = 5E8415522BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN */; };
 		5E9FCCF42BBC8E25009EE67D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCCF32BBC8E25009EE67D /* ContentView.swift */; };
@@ -41,7 +42,6 @@
 		5E9FCD422BBC8E27009EE67D /* ObservableAUParameter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCD412BBC8E27009EE67D /* ObservableAUParameter.swift */; };
 		5E9FCD442BBC8E27009EE67D /* AudioUnitViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCD432BBC8E27009EE67D /* AudioUnitViewController.swift */; };
 		5E9FCD572BBCABC2009EE67D /* libnuked-sc55.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E9FCD562BBCABB7009EE67D /* libnuked-sc55.a */; };
-		5E9FCD592BBCABE8009EE67D /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E9FCD582BBCABDF009EE67D /* libSDL2.a */; };
 		5E9FCD5F2BBCB1F6009EE67D /* back.data in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD5E2BBCB1F6009EE67D /* back.data */; };
 		5E9FCD652BBCB206009EE67D /* rom_sm.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD602BBCB206009EE67D /* rom_sm.bin */; };
 		5E9FCD662BBCB206009EE67D /* rom2.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD612BBCB206009EE67D /* rom2.bin */; };
@@ -83,6 +83,7 @@
 		5E0B43B42BC45C3C0028D51B /* jv880_rom1.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = jv880_rom1.bin; path = ../../../../build/jv880_rom1.bin; sourceTree = "<group>"; };
 		5E0B43B52BC45C3C0028D51B /* jv880_waverom2.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = jv880_waverom2.bin; path = ../../../../build/jv880_waverom2.bin; sourceTree = "<group>"; };
 		5E0B43B62BC45C3C0028D51B /* jv880_rom2.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = jv880_rom2.bin; path = ../../../../build/jv880_rom2.bin; sourceTree = "<group>"; };
+		5E2CB6BF2BD5B69C0079B9B1 /* jv880_waverom_expansion.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = jv880_waverom_expansion.bin; path = ../../../../build/jv880_waverom_expansion.bin; sourceTree = "<group>"; };
 		5E8415502BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "SR-JV80-09 Session - CS 0x3F381791.BIN"; path = "../../../../../../../Downloads/SR-JV/SR-JV80-09 Session - CS 0x3F381791/SR-JV80-09 Session - CS 0x3F381791.BIN"; sourceTree = "<group>"; };
 		5E8415522BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN"; path = "../../../../../../../Downloads/SR-JV/SR-JV80-04 Vintage Synth - CS 0x3E23B90C/SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN"; sourceTree = "<group>"; };
 		5E9FCCF02BBC8E25009EE67D /* sc55AU2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = sc55AU2.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -118,7 +119,6 @@
 		5E9FCD432BBC8E27009EE67D /* AudioUnitViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioUnitViewController.swift; sourceTree = "<group>"; };
 		5E9FCD452BBC8E27009EE67D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5E9FCD562BBCABB7009EE67D /* libnuked-sc55.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libnuked-sc55.a"; path = "../../build/libnuked-sc55.a"; sourceTree = "<group>"; };
-		5E9FCD582BBCABDF009EE67D /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = ../../../../../../../opt/homebrew/Cellar/sdl2/2.28.5/lib/libSDL2.a; sourceTree = "<group>"; };
 		5E9FCD5A2BBCAF82009EE67D /* sc55AU2Extension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = sc55AU2Extension.entitlements; sourceTree = "<group>"; };
 		5E9FCD5E2BBCB1F6009EE67D /* back.data */ = {isa = PBXFileReference; lastKnownFileType = file; name = back.data; path = ../../../../data/back.data; sourceTree = "<group>"; };
 		5E9FCD602BBCB206009EE67D /* rom_sm.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = rom_sm.bin; path = ../../../../build/rom_sm.bin; sourceTree = "<group>"; };
@@ -143,7 +143,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5E9FCD592BBCABE8009EE67D /* libSDL2.a in Frameworks */,
 				5E9FCD572BBCABC2009EE67D /* libnuked-sc55.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -358,7 +357,6 @@
 		5E9FCD552BBCABB7009EE67D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				5E9FCD582BBCABDF009EE67D /* libSDL2.a */,
 				5E9FCD562BBCABB7009EE67D /* libnuked-sc55.a */,
 			);
 			name = Frameworks;
@@ -367,6 +365,7 @@
 		5E9FCD5D2BBCB1E8009EE67D /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				5E2CB6BF2BD5B69C0079B9B1 /* jv880_waverom_expansion.bin */,
 				5E0B43B42BC45C3C0028D51B /* jv880_rom1.bin */,
 				5E0B43B62BC45C3C0028D51B /* jv880_rom2.bin */,
 				5E0B43B32BC45C3B0028D51B /* jv880_waverom1.bin */,
@@ -475,6 +474,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5E2CB6C02BD5B69C0079B9B1 /* jv880_waverom_expansion.bin in Resources */,
 				5E9FCD1D2BBC8E27009EE67D /* README.md in Resources */,
 				5E9FCD5F2BBCB1F6009EE67D /* back.data in Resources */,
 				5E8415532BCAF27500DECDE8 /* SR-JV80-04 Vintage Synth - CS 0x3E23B90C.BIN in Resources */,
@@ -687,8 +687,7 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
-					"/Users/giuliozausa/personal/programming/Nuked-SC55/src",
-					"/opt/homebrew/Cellar/sdl2/2.28.5/include/**",
+					"../../src",
 				);
 				INFOPLIST_FILE = sc55AU2Extension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = sc55AU2Extension;
@@ -699,8 +698,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"/Users/giuliozausa/personal/programming/Nuked-SC55/build",
-					/opt/homebrew/Cellar/sdl2/2.28.5/lib,
+					"../../build",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = giulioz.sc55AU2.sc55AU2Extension;
@@ -726,8 +724,7 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
-					"/Users/giuliozausa/personal/programming/Nuked-SC55/src",
-					"/opt/homebrew/Cellar/sdl2/2.28.5/include/**",
+					"../../src",
 				);
 				INFOPLIST_FILE = sc55AU2Extension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = sc55AU2Extension;
@@ -738,8 +735,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"/Users/giuliozausa/personal/programming/Nuked-SC55/build",
-					/opt/homebrew/Cellar/sdl2/2.28.5/lib,
+					"../../build",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = giulioz.sc55AU2.sc55AU2Extension;
