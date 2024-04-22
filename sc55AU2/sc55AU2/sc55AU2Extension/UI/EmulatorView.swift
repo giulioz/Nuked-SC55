@@ -111,7 +111,7 @@ public struct Renderer {
 class Screen : ObservableObject {
     @Published
     var toggle: Bool = false
-    public  var image: Image? {
+    public var image: Image? {
         didSet {
             DispatchQueue.main.async { [weak self] in
                 self?.toggle.toggle()
@@ -120,30 +120,23 @@ class Screen : ObservableObject {
     }
     
     var renderer: Renderer
-    private var displayLink: CVDisplayLink?
-    
-    let displayCallback: CVDisplayLinkOutputCallback = { displayLink, inNow, inOutputTime, flagsIn, flagsOut, displayLinkContext in
-        let screen = unsafeBitCast(displayLinkContext, to: Screen.self)
-        screen.renderer.draw()
-        screen.image = Image(bitmap: screen.renderer.bitmap)
-        return kCVReturnSuccess
-    }
+    var timer: Timer?
     
     init(width: Int, height: Int) {
         self.renderer = Renderer(width: width, height: height)
-
-        let error = CVDisplayLinkCreateWithActiveCGDisplays(&self.displayLink)
-        guard let link = self.displayLink, kCVReturnSuccess == error else {
-            NSLog("Display Link created with error: %d", error)
-            return
-        }
-
-        CVDisplayLinkSetOutputCallback(link, displayCallback, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
-        CVDisplayLinkStart(link)
     }
     
     deinit {
-        CVDisplayLinkStop(self.displayLink!)
+        timer?.invalidate()
+    }
+    
+    func start() {
+        timer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(timerAction), userInfo: nil, repeats: true)
+    }
+    
+    @objc func timerAction() {
+        self.renderer.draw()
+        self.image = Image(bitmap: self.renderer.bitmap)
     }
 }
 
@@ -177,11 +170,13 @@ struct EmulatorView: View {
                 .interpolation(.none)
                 .frame(width: CGFloat(lcd_width)/2, height: CGFloat(lcd_height)/2, alignment: .center)
                 .aspectRatio(contentMode: .fit)
-                .onAppear(perform: { screen.renderer.audioUnit = audioUnit })
             
 //            SC55Buttons(audioUnit: audioUnit)
             JV880Buttons(audioUnit: audioUnit)
-        }
+        }.onAppear(perform: {
+            screen.renderer.audioUnit = audioUnit
+            screen.start()
+        })
     }
 }
 
