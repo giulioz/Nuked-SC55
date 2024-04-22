@@ -7,32 +7,26 @@
 
 import SwiftUI
 
-public struct Color {
-    public var r, g, b, a: UInt8
-    
-    public init(r: UInt8, g: UInt8, b: UInt8, a: UInt8 = 255) {
-        self.r = r
-        self.g = g
-        self.b = b
-        self.a = a
-    }
-}
+// let width = 741;
+// let height = 268;
+let lcd_width = 820;
+let lcd_height = 100;
 
 extension Image {
-    init?(bitmap: Bitmap) {
+    init?(imgData: [UInt8]) {
         let alphaInfo = CGImageAlphaInfo.premultipliedLast
-        let bytesPerPixel = MemoryLayout<Color>.size
-        let bytesPerRow = bitmap.width * bytesPerPixel
+        let bytesPerPixel = 4
+        let bytesPerRow = lcd_width * bytesPerPixel
 
         guard let providerRef = CGDataProvider(data: Data(
-            bytes: bitmap.pixels, count: bitmap.height * bytesPerRow
+            bytes: imgData, count: lcd_height * bytesPerRow
         ) as CFData) else {
             return nil
         }
 
         guard let cgImage = CGImage(
-            width: bitmap.width,
-            height: bitmap.height,
+            width: lcd_width,
+            height: lcd_height,
             bitsPerComponent: 8,
             bitsPerPixel: bytesPerPixel * 8,
             bytesPerRow: bytesPerRow,
@@ -50,64 +44,6 @@ extension Image {
     }
 }
 
-public struct Bitmap {
-    public private(set) var pixels: [Color]
-    public let width: Int
-    
-    public init(width: Int, pixels: [Color]) {
-        self.width  = width
-        self.pixels = pixels
-    }
-    
-    var height: Int {
-        return pixels.count / width
-    }
-    
-    subscript(x: Int, y: Int) -> Color {
-        get { return pixels[y * width + x] }
-        set { pixels[y * width + x] = newValue }
-    }
-
-    init(width: Int, height: Int, color: Color) {
-        self.pixels = Array(repeating: color, count: width * height)
-        self.width  = width
-    }
-}
-
-// let width = 741;
-// let height = 268;
-let lcd_width = 820;
-let lcd_height = 100;
-
-public struct Renderer {
-    public private(set) var bitmap: Bitmap
-    var audioUnit: sc55AU2ExtensionAudioUnit?
-    
-    public init(width: Int, height: Int) {
-        self.bitmap = Bitmap(width: width, height: height, color: Color.init(
-            r: 0, g: 0,b: 0, a: 0
-        ))
-    }
-    
-    mutating func draw() {
-        if let audioUnitR = audioUnit {
-            let lcdResult = audioUnitR.lcd_Update();
-            if lcdResult != nil {
-                for x in 0...(lcd_width-1) {
-                    for y in 0...(lcd_height-1) {
-                        bitmap[x, y] = Color.init(
-                            r: UInt8((lcdResult![x + y * 1024] >> 0) & 0xff),
-                            g: UInt8((lcdResult![x + y * 1024] >> 8) & 0xff),
-                            b: UInt8((lcdResult![x + y * 1024] >> 16) & 0xff),
-                            a: 255
-                        )
-                    }
-                }
-             }
-        }
-    }
-}
-
 class Screen : ObservableObject {
     @Published
     var toggle: Bool = false
@@ -119,11 +55,12 @@ class Screen : ObservableObject {
         }
     }
     
-    var renderer: Renderer
+    public private(set) var imgData: [UInt8]
+    var audioUnit: sc55AU2ExtensionAudioUnit?
     var timer: Timer?
     
-    init(width: Int, height: Int) {
-        self.renderer = Renderer(width: width, height: height)
+    init() {
+        self.imgData = Array(repeating: 0x00, count: lcd_width * lcd_height * 4)
     }
     
     deinit {
@@ -135,8 +72,24 @@ class Screen : ObservableObject {
     }
     
     @objc func timerAction() {
-        self.renderer.draw()
-        self.image = Image(bitmap: self.renderer.bitmap)
+        self.draw()
+        self.image = Image(imgData: self.imgData)
+    }
+
+    func draw() {
+        if let audioUnitR = audioUnit {
+            let lcdResult = audioUnitR.lcd_Update();
+            if lcdResult != nil {
+                for y in 0...(lcd_height-1) {
+                    for x in 0...(lcd_width-1) {
+                        imgData[(x + y * lcd_width) * 4 + 0] = UInt8((lcdResult![x + y * 1024] >> 0) & 0xff)
+                        imgData[(x + y * lcd_width) * 4 + 1] = UInt8((lcdResult![x + y * 1024] >> 8) & 0xff)
+                        imgData[(x + y * lcd_width) * 4 + 2] = UInt8((lcdResult![x + y * 1024] >> 16) & 0xff)
+                        imgData[(x + y * lcd_width) * 4 + 3] = 255
+                    }
+                }
+             }
+        }
     }
 }
 
@@ -161,7 +114,7 @@ struct EmulatorView: View {
     var audioUnit: sc55AU2ExtensionAudioUnit?
     
     @ObservedObject
-    var screen = Screen(width: lcd_width, height: lcd_height)
+    var screen = Screen()
     
     var body: some View {
         VStack {
@@ -174,7 +127,7 @@ struct EmulatorView: View {
 //            SC55Buttons(audioUnit: audioUnit)
             JV880Buttons(audioUnit: audioUnit)
         }.onAppear(perform: {
-            screen.renderer.audioUnit = audioUnit
+            screen.audioUnit = audioUnit
             screen.start()
         })
     }
