@@ -293,17 +293,8 @@ struct MCU {
 
     int rom2_mask = ROM2_SIZE - 1;
 
-    int audio_buffer_size;
-    int audio_page_size;
-    int *sample_buffer;
-
-    int sample_read_ptr;
-    int sample_write_ptr;
-
-    SDL_AudioDeviceID sdl_audio;
-
-    bool work_thread_run = false;
-    SDL_mutex *work_thread_lock;
+    short sample_buffer[audio_buffer_size] = {0};
+    int sample_write_ptr = 0;
 
     int ga_int[8] = {0};
     int ga_int_enable = 0;
@@ -379,13 +370,10 @@ struct MCU {
     void MCU_PostUART(uint8_t data);
     void MCU_EncoderTrigger(int dir);
 
-    void MCU_WorkThread_Lock(void);
-    void MCU_WorkThread_Unlock(void);
-
-    int startSC55(int argc, char *argv[]);
-    int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum);
-    void MCU_CloseAudio(void);
-    void MIDI_Reset(ResetType resetType);
+    int startSC55(std::string *basepath);
+    int updateSC55(int16_t *data, unsigned int dataSize);
+    void postMidiSC55(uint8_t* message, int length);
+    void SC55_Reset();
 
     uint8_t RCU_Read(void);
     uint16_t MCU_AnalogReadPin(uint32_t pin);

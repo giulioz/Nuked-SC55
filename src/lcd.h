@@ -64,17 +64,12 @@ struct LCD {
 
     uint32_t lcd_buffer[lcd_height_max][lcd_width_max];
     uint32_t lcd_background[268][741];
-
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    SDL_Texture *texture;
-
+    
     void LCD_SetBackPath(const std::string &path);
     void LCD_FontRenderStandard(int32_t x, int32_t y, uint8_t ch, bool overlay = false);
     void LCD_FontRenderLevel(int32_t x, int32_t y, uint8_t ch, uint8_t width = 5);
     void LCD_FontRenderLR(uint8_t ch);
     void LCD_Init();
-    void LCD_UnInit(void);
     void LCD_Write(uint32_t address, uint8_t data);
     void LCD_Enable(uint32_t enable);
     bool LCD_QuitRequested();
