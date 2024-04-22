@@ -1089,9 +1089,9 @@ void unscramble(uint8_t *src, uint8_t *dst, int len)
 
 void MCU::MCU_PostSample(int *sample)
 {
-    sample_buffer[sample_write_ptr + 0] = sample[0];
-    sample_buffer[sample_write_ptr + 1] = sample[1];
-    sample_write_ptr = (sample_write_ptr + 2) % audio_buffer_size;
+    sample_buffer_l[sample_write_ptr] = sample[0] / 2147483648.0;
+    sample_buffer_r[sample_write_ptr] = sample[1] / 2147483648.0;
+    sample_write_ptr = (sample_write_ptr + 1) % audio_buffer_size;
 }
 
 void MCU::MCU_GA_SetGAInt(int line, int value)
@@ -1354,33 +1354,25 @@ int MCU::startSC55(std::string *basePath)
     return 0;
 }
 
-int MCU::updateSC55(int32_t *data, unsigned int dataSize) {
-    // auto start = std::chrono::high_resolution_clock::now();
-
-    dataSize /= 4;
-
-    if (audio_buffer_size < dataSize) {
-        printf("Audio buffer size is too small. (%d requested)\n", dataSize);
+void MCU::updateSC55WithSampleRate(float *dataL, float *dataR, unsigned int nFrames, int destSampleRate) {
+    const unsigned int renderBufferFrames = ceil((double)nFrames / destSampleRate * 64000);
+    
+    if (audio_buffer_size < renderBufferFrames) {
+        printf("Audio buffer size is too small. (%d requested)\n", renderBufferFrames);
         fflush(stdout);
-        return 0;
+        return;
     }
 
     sample_write_ptr = 0;
-    // memset(sample_buffer, 0, audio_buffer_size * 2);
 
-    int maxCycles = dataSize * 256;
+    int maxCycles = nFrames * 256;
 
-    for (int i = 0; sample_write_ptr < dataSize; i++) {
+    for (int i = 0; sample_write_ptr < renderBufferFrames; i++) {
         if (i > maxCycles) {
             printf("Not enough samples!\n");
             fflush(stdout);
             break;
         }
-
-        if (pcm.pcm.config_reg_3c & 0x40)
-            sample_write_ptr &= ~3;
-        else
-            sample_write_ptr &= ~1;
 
         if (!mcu.ex_ignore)
             MCU_Interrupt_Handle(this);
@@ -1410,30 +1402,6 @@ int MCU::updateSC55(int32_t *data, unsigned int dataSize) {
         MCU_UpdateAnalog(mcu.cycles);
     }
 
-    memcpy(data, sample_buffer, dataSize * 4);
-
-    // auto stop = std::chrono::high_resolution_clock::now();
-    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-    // if (duration > 8) {
-    //     printf("updateSC55 took %lld ms\n", duration);
-    //     fflush(stdout);
-    // }
-
-    return 0;
-}
-
-void MCU::updateSC55WithSampleRate(float *dataL, float *dataR, unsigned int nFrames, int destSampleRate) {
-    const unsigned int renderBufferFrames = ceil((double)nFrames / destSampleRate * 64000);
-    int32_t *renderBuffer = (int32_t *)malloc(renderBufferFrames * 4 * 2);
-    updateSC55(renderBuffer, renderBufferFrames * 4 * 2);
-
-    float* renderBufferFloatL = (float *)malloc(renderBufferFrames * 4);
-    float* renderBufferFloatR = (float *)malloc(renderBufferFrames * 4);
-    for (size_t i = 0; i < renderBufferFrames; i++) {
-        renderBufferFloatL[i] = renderBuffer[i * 2 + 0] / 2147483648.0;
-        renderBufferFloatR[i] = renderBuffer[i * 2 + 1] / 2147483648.0;
-    }
-
     double ratio = (double)destSampleRate / 64000;
     if (savedDestSampleRate != destSampleRate) {
         savedDestSampleRate = destSampleRate;
@@ -1445,14 +1413,8 @@ void MCU::updateSC55WithSampleRate(float *dataL, float *dataR, unsigned int nFra
 
     int inUsedL = 0;
     int inUsedR = 0;
-    resample_process(resampleL, ratio, renderBufferFloatL, renderBufferFrames, false, &inUsedL, dataL, nFrames);
-    resample_process(resampleR, ratio, renderBufferFloatR, renderBufferFrames, false, &inUsedR, dataR, nFrames);
-
-    // for (size_t i = 0; i < nFrames; i++) {
-    //     unsigned int srcI = (unsigned int)((float)i / destSampleRate * 64000);
-    //     dataL[i] = renderBuffer[srcI * 2 + 0] / 2147483648.0;
-    //     dataR[i] = renderBuffer[srcI * 2 + 1] / 2147483648.0;
-    // }
+    resample_process(resampleL, ratio, sample_buffer_l, renderBufferFrames, false, &inUsedL, dataL, nFrames);
+    resample_process(resampleR, ratio, sample_buffer_r, renderBufferFrames, false, &inUsedR, dataR, nFrames); 
 }
 
 void MCU::SC55_Reset() {

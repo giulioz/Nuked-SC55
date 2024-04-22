@@ -291,7 +291,8 @@ struct MCU {
 
     int rom2_mask = ROM2_SIZE - 1;
 
-    int sample_buffer[audio_buffer_size] = {0};
+    float sample_buffer_l[audio_buffer_size] = {0};
+    float sample_buffer_r[audio_buffer_size] = {0};
     int sample_write_ptr = 0;
 
     int ga_int[8] = {0};
@@ -371,7 +372,6 @@ struct MCU {
     void MCU_EncoderTrigger(int dir);
 
     int startSC55(std::string *basepath);
-    int updateSC55(int32_t *data, unsigned int dataSize);
     void updateSC55WithSampleRate(float *dataL, float *dataR, unsigned int nFrames, int destSampleRate);
     void postMidiSC55(uint8_t* message, int length);
     void SC55_Reset();
