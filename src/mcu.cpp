@@ -1386,10 +1386,10 @@ int MCU::startSC55(std::string *basePath)
     return 0;
 }
 
-int MCU::updateSC55(int16_t *data, unsigned int dataSize) {
+int MCU::updateSC55(int32_t *data, unsigned int dataSize) {
     // auto start = std::chrono::high_resolution_clock::now();
 
-    dataSize /= 2;
+    dataSize /= 4;
 
     if (audio_buffer_size < dataSize) {
         printf("Audio buffer size is too small. (%d requested)\n", dataSize);
@@ -1437,7 +1437,7 @@ int MCU::updateSC55(int16_t *data, unsigned int dataSize) {
         MCU_UpdateAnalog(mcu.cycles);
     }
 
-    memcpy(data, sample_buffer, dataSize * 2);
+    memcpy(data, sample_buffer, dataSize * 4);
 
     // auto stop = std::chrono::high_resolution_clock::now();
     // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();

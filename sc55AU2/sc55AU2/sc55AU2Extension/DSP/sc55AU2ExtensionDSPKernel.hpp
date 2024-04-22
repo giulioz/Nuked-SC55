@@ -35,10 +35,10 @@ public:
         AudioStreamBasicDescription sourceDescription;
 //        sourceDescription.mSampleRate = 66207;
         sourceDescription.mSampleRate = 64000;
-        sourceDescription.mBytesPerFrame = 4;
-        sourceDescription.mBitsPerChannel = 16;
+        sourceDescription.mBytesPerFrame = 8;
+        sourceDescription.mBitsPerChannel = 32;
         sourceDescription.mFormatID = kAudioFormatLinearPCM;
-        sourceDescription.mBytesPerPacket = 4;
+        sourceDescription.mBytesPerPacket = 8;
         sourceDescription.mChannelsPerFrame = 2;
         sourceDescription.mFormatFlags = kAudioFormatFlagIsSignedInteger;
         sourceDescription.mFramesPerPacket = 1;
@@ -112,7 +112,7 @@ public:
      Do your custom DSP here.
      */
     void process(AUAudioFrameCount frameCount, AudioBufferList* outBufferList) {
-        // auto start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
 
         UInt32 ioOutputDataPackets = frameCount * destFormat.mFramesPerPacket;
         AudioConverterFillComplexBuffer(audioConverterRef, EncoderDataProc,
@@ -120,12 +120,12 @@ public:
                                         outBufferList, NULL);
 
 
-        // auto stop = std::chrono::high_resolution_clock::now();
-        // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-        // if (duration > 8) {
-        //     printf("process took %lld ms\n", duration);
-        //     fflush(stdout);
-        // }
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+        if (duration > 1000) {
+            printf("process took %lld ms\n", duration);
+            fflush(stdout);
+        }
     }
     
     void handleOneEvent(AURenderEvent const *event) {
@@ -194,7 +194,7 @@ public:
     AudioConverterRef audioConverterRef;
     AudioStreamBasicDescription destFormat;
 
-    int16_t *lastBufferData;
+    int32_t *lastBufferData;
 
     int nInits = 0;
     
@@ -214,8 +214,8 @@ OSStatus EncoderDataProc(AudioConverterRef inAudioConverter, UInt32 *ioNumberDat
 
   unsigned int amountToWrite = *ioNumberDataPackets;
 
-  unsigned int dataSize = amountToWrite * 2 * 2;
-  int16_t *dataBuff = (int16_t *)malloc(dataSize);
+  unsigned int dataSize = amountToWrite * 2 * 4;
+  int32_t *dataBuff = (int32_t *)malloc(dataSize);
 //   memset(dataBuff, 0, dataSize);
   _this->mcu->updateSC55(dataBuff, dataSize);
   _this->lastBufferData = dataBuff;
