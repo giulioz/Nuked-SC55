@@ -33,7 +33,6 @@
 		5E9FCD252BBC8E27009EE67D /* CrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCD242BBC8E27009EE67D /* CrossPlatform.swift */; };
 		5E9FCD272BBC8E27009EE67D /* String+Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCD262BBC8E27009EE67D /* String+Utils.swift */; };
 		5E9FCD2B2BBC8E27009EE67D /* sc55AU2ExtensionAudioUnit.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCD2A2BBC8E27009EE67D /* sc55AU2ExtensionAudioUnit.mm */; };
-		5E9FCD2E2BBC8E27009EE67D /* sc55AU2ExtensionAUProcessHelper.hpp in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD2D2BBC8E27009EE67D /* sc55AU2ExtensionAUProcessHelper.hpp */; };
 		5E9FCD322BBC8E27009EE67D /* Parameters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCD312BBC8E27009EE67D /* Parameters.swift */; };
 		5E9FCD362BBC8E27009EE67D /* sc55AU2ExtensionDSPKernel.hpp in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD352BBC8E27009EE67D /* sc55AU2ExtensionDSPKernel.hpp */; };
 		5E9FCD392BBC8E27009EE67D /* sc55AU2ExtensionMainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9FCD382BBC8E27009EE67D /* sc55AU2ExtensionMainView.swift */; };
@@ -108,7 +107,6 @@
 		5E9FCD262BBC8E27009EE67D /* String+Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Utils.swift"; sourceTree = "<group>"; };
 		5E9FCD292BBC8E27009EE67D /* sc55AU2ExtensionAudioUnit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = sc55AU2ExtensionAudioUnit.h; sourceTree = "<group>"; };
 		5E9FCD2A2BBC8E27009EE67D /* sc55AU2ExtensionAudioUnit.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = sc55AU2ExtensionAudioUnit.mm; sourceTree = "<group>"; };
-		5E9FCD2D2BBC8E27009EE67D /* sc55AU2ExtensionAUProcessHelper.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = sc55AU2ExtensionAUProcessHelper.hpp; sourceTree = "<group>"; };
 		5E9FCD302BBC8E27009EE67D /* sc55AU2ExtensionParameterAddresses.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = sc55AU2ExtensionParameterAddresses.h; sourceTree = "<group>"; };
 		5E9FCD312BBC8E27009EE67D /* Parameters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parameters.swift; sourceTree = "<group>"; };
 		5E9FCD352BBC8E27009EE67D /* sc55AU2ExtensionDSPKernel.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = sc55AU2ExtensionDSPKernel.hpp; sourceTree = "<group>"; };
@@ -299,14 +297,6 @@
 			path = "Audio Unit";
 			sourceTree = "<group>";
 		};
-		5E9FCD2C2BBC8E27009EE67D /* DSP */ = {
-			isa = PBXGroup;
-			children = (
-				5E9FCD2D2BBC8E27009EE67D /* sc55AU2ExtensionAUProcessHelper.hpp */,
-			);
-			path = DSP;
-			sourceTree = "<group>";
-		};
 		5E9FCD2F2BBC8E27009EE67D /* Parameters */ = {
 			isa = PBXGroup;
 			children = (
@@ -481,7 +471,6 @@
 				5E8415512BCAF26300DECDE8 /* SR-JV80-09 Session - CS 0x3F381791.BIN in Resources */,
 				5E0B43BA2BC45C3C0028D51B /* jv880_rom2.bin in Resources */,
 				5E9FCD362BBC8E27009EE67D /* sc55AU2ExtensionDSPKernel.hpp in Resources */,
-				5E9FCD2E2BBC8E27009EE67D /* sc55AU2ExtensionAUProcessHelper.hpp in Resources */,
 				5E9FCD662BBCB206009EE67D /* rom2.bin in Resources */,
 				5EE5C05B2BCA263E00673E54 /* SR-JV80-01 Pop - CS 0x3F1CF705.bin in Resources */,
 				5E9FCD682BBCB206009EE67D /* waverom2.bin in Resources */,

@@ -10,7 +10,6 @@
 #import <AVFoundation/AVFoundation.h>
 #import <CoreAudioKit/AUViewController.h>
 
-#import "sc55AU2ExtensionAUProcessHelper.hpp"
 #import "sc55AU2ExtensionDSPKernel.hpp"
 
 
@@ -27,7 +26,6 @@
 @implementation sc55AU2ExtensionAudioUnit {
     // C++ members need to be ivars; they would be copied on access if they were properties.
     sc55AU2ExtensionDSPKernel _kernel;
-    std::unique_ptr<AUProcessHelper> _processHelper;
 }
 
 @synthesize parameterTree = _parameterTree;
@@ -123,7 +121,6 @@
     
     _kernel.setMusicalContextBlock(self.musicalContextBlock);
     _kernel.initialize(outputChannelCount, _outputBus.format.sampleRate, outputFormat);
-    _processHelper = std::make_unique<AUProcessHelper>(_kernel, outputChannelCount);
     return [super allocateRenderResourcesAndReturnError:outError];
 }
 
@@ -153,7 +150,6 @@
      */
     // Specify captured objects are mutable.
     __block sc55AU2ExtensionDSPKernel *kernel = &_kernel;
-    __block std::unique_ptr<AUProcessHelper> &processHelper = _processHelper;
     
     return ^AUAudioUnitStatus(AudioUnitRenderActionFlags 				*actionFlags,
                               const AudioTimeStamp       				*timestamp,
@@ -167,22 +163,16 @@
             return kAudioUnitErr_TooManyFramesToProcess;
         }
         
-        /*
-         Important:
-         If the caller passed non-null output pointers (outputData->mBuffers[x].mData), use those.
-         
-         If the caller passed null output buffer pointers, process in memory owned by the Audio Unit
-         and modify the (outputData->mBuffers[x].mData) pointers to point to this owned memory.
-         The Audio Unit is responsible for preserving the validity of this memory until the next call to render,
-         or deallocateRenderResources is called.
-         
-         If your algorithm cannot process in-place, you will need to preallocate an output buffer
-         and use it here.
-         
-         See the description of the canProcessInPlace property.
-         */
-        processHelper->processWithEvents(outputData, timestamp, frameCount, realtimeEventListHead);
+        kernel->process(frameCount, outputData);
         
+        AUEventSampleTime now = AUEventSampleTime(timestamp->mSampleTime);
+        AURenderEvent const *event = realtimeEventListHead;
+        
+        while (event) {
+            kernel->handleOneEvent(event);
+            event = event->head.next;
+        }
+
         return noErr;
     };
 }

@@ -111,7 +111,7 @@ public:
      This function does the core siginal processing.
      Do your custom DSP here.
      */
-    void process(AUEventSampleTime bufferStartTime, AUAudioFrameCount frameCount, AudioBufferList* outBufferList) {
+    void process(AUAudioFrameCount frameCount, AudioBufferList* outBufferList) {
         // auto start = std::chrono::high_resolution_clock::now();
 
         UInt32 ioOutputDataPackets = frameCount * destFormat.mFramesPerPacket;
@@ -128,15 +128,15 @@ public:
         // }
     }
     
-    void handleOneEvent(AUEventSampleTime now, AURenderEvent const *event) {
+    void handleOneEvent(AURenderEvent const *event) {
         switch (event->head.eventType) {
             case AURenderEventParameter: {
-                handleParameterEvent(now, event->parameter);
+                handleParameterEvent(event->parameter);
                 break;
             }
                 
             case AURenderEventMIDIEventList: {
-                handleMIDIEventList(now, &event->MIDIEventsList);
+                handleMIDIEventList(&event->MIDIEventsList);
                 break;
             }
                 
@@ -145,11 +145,11 @@ public:
         }
     }
     
-    void handleParameterEvent(AUEventSampleTime now, AUParameterEvent const& parameterEvent) {
+    void handleParameterEvent(AUParameterEvent const& parameterEvent) {
         // Implement handling incoming Parameter events as needed
     }
     
-    void handleMIDIEventList(AUEventSampleTime now, AUMIDIEventList const* midiEvent) {
+    void handleMIDIEventList(AUMIDIEventList const* midiEvent) {
         auto visitor = [] (void* context, MIDITimeStamp timeStamp, MIDIUniversalMessage message) {
             auto thisObject = static_cast<sc55AU2ExtensionDSPKernel *>(context);
             
