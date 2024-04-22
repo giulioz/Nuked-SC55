@@ -1348,6 +1348,7 @@ int MCU::startSC55(std::string *basePath)
     MCU_Reset();
     sub_mcu.SM_Reset();
     pcm.PCM_Reset();
+    mcu_timer.TIMER_Reset();
 
     for (int i = 0; i < 1024 * 4; i++) {
         if (!mcu.ex_ignore)
@@ -1455,6 +1456,7 @@ void MCU::SC55_Reset() {
     MCU_Reset();
     sub_mcu.SM_Reset();
     pcm.PCM_Reset();
+    mcu_timer.TIMER_Reset();
 
     sample_write_ptr = 0;
 }

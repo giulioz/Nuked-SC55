@@ -65,6 +65,13 @@ struct MCU_Timer {
     frt_t frt[3];
     mcu_timer_t timer;
 
+    uint8_t timer_lut1[4] = {3,7,31,1};
+    uint8_t timer_mk1_lut1[4] = {3,7,31,3};
+    uint8_t* p_timer_lut1;
+    uint16_t timer_lut2[8] = {0,7,63,1023,0,1,1,1};
+    uint16_t timer_mk1_lut2[8] = {0,7,63,1023,0,3,3,3};
+    uint16_t* p_timer_lut2;
+
     void TIMER_Reset(void);
     void TIMER_Write(uint32_t address, uint8_t data);
     uint8_t TIMER_Read(uint32_t address);
