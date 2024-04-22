@@ -194,5 +194,9 @@
     _kernel.mcu->MCU_EncoderTrigger(dir);
 };
 
+- (void)MCU_PostUART:(uint8_t) data {
+    _kernel.mcu->MCU_PostUART(data);
+};
+
 @end
 

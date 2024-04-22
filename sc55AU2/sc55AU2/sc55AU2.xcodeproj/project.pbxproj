@@ -47,6 +47,8 @@
 		5E9FCD672BBCB206009EE67D /* waverom1.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD622BBCB206009EE67D /* waverom1.bin */; };
 		5E9FCD682BBCB206009EE67D /* waverom2.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD632BBCB206009EE67D /* waverom2.bin */; };
 		5E9FCD692BBCB206009EE67D /* rom1.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5E9FCD642BBCB206009EE67D /* rom1.bin */; };
+		5EAD02B32BD6C55E00828561 /* SystemConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAD02B22BD6C55D00828561 /* SystemConfig.swift */; };
+		5EAD02B52BD6D67A00828561 /* nvram.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5EAD02B42BD6D67A00828561 /* nvram.bin */; };
 		5EE5C05B2BCA263E00673E54 /* SR-JV80-01 Pop - CS 0x3F1CF705.bin in Resources */ = {isa = PBXBuildFile; fileRef = 5EE5C05A2BCA263E00673E54 /* SR-JV80-01 Pop - CS 0x3F1CF705.bin */; };
 		5EE5C05D2BCAA00000673E54 /* SC55Buttons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE5C05C2BCAA00000673E54 /* SC55Buttons.swift */; };
 		5EE5C05F2BCAA04500673E54 /* JV880Buttons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE5C05E2BCAA04500673E54 /* JV880Buttons.swift */; };
@@ -124,6 +126,8 @@
 		5E9FCD622BBCB206009EE67D /* waverom1.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = waverom1.bin; path = ../../../../build/waverom1.bin; sourceTree = "<group>"; };
 		5E9FCD632BBCB206009EE67D /* waverom2.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = waverom2.bin; path = ../../../../build/waverom2.bin; sourceTree = "<group>"; };
 		5E9FCD642BBCB206009EE67D /* rom1.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = rom1.bin; path = ../../../../build/rom1.bin; sourceTree = "<group>"; };
+		5EAD02B22BD6C55D00828561 /* SystemConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemConfig.swift; sourceTree = "<group>"; };
+		5EAD02B42BD6D67A00828561 /* nvram.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = nvram.bin; sourceTree = "<group>"; };
 		5EE5C05A2BCA263E00673E54 /* SR-JV80-01 Pop - CS 0x3F1CF705.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "SR-JV80-01 Pop - CS 0x3F1CF705.bin"; path = "../../../../build/SR-JV80-01 Pop - CS 0x3F1CF705.bin"; sourceTree = "<group>"; };
 		5EE5C05C2BCAA00000673E54 /* SC55Buttons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SC55Buttons.swift; sourceTree = "<group>"; };
 		5EE5C05E2BCAA04500673E54 /* JV880Buttons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JV880Buttons.swift; sourceTree = "<group>"; };
@@ -265,7 +269,6 @@
 				5E9FCD202BBC8E27009EE67D /* Parameters */,
 				5E9FCD232BBC8E27009EE67D /* Utility */,
 				5E9FCD282BBC8E27009EE67D /* Audio Unit */,
-				5E9FCD2C2BBC8E27009EE67D /* DSP */,
 				5E9FCD3C2BBC8E27009EE67D /* UI */,
 			);
 			path = Common;
@@ -317,6 +320,7 @@
 		5E9FCD372BBC8E27009EE67D /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				5EAD02B22BD6C55D00828561 /* SystemConfig.swift */,
 				5E9FCD382BBC8E27009EE67D /* sc55AU2ExtensionMainView.swift */,
 				5E9FCD3A2BBC8E27009EE67D /* ParameterSlider.swift */,
 				5E0B43362BBEEB600028D51B /* EmulatorView.swift */,
@@ -355,6 +359,7 @@
 		5E9FCD5D2BBCB1E8009EE67D /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				5EAD02B42BD6D67A00828561 /* nvram.bin */,
 				5E2CB6BF2BD5B69C0079B9B1 /* jv880_waverom_expansion.bin */,
 				5E0B43B42BC45C3C0028D51B /* jv880_rom1.bin */,
 				5E0B43B62BC45C3C0028D51B /* jv880_rom2.bin */,
@@ -464,6 +469,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5EAD02B52BD6D67A00828561 /* nvram.bin in Resources */,
 				5E2CB6C02BD5B69C0079B9B1 /* jv880_waverom_expansion.bin in Resources */,
 				5E9FCD1D2BBC8E27009EE67D /* README.md in Resources */,
 				5E9FCD5F2BBCB1F6009EE67D /* back.data in Resources */,
@@ -510,6 +516,7 @@
 				5E9FCD322BBC8E27009EE67D /* Parameters.swift in Sources */,
 				5E9FCD222BBC8E27009EE67D /* ParameterSpecBase.swift in Sources */,
 				5E9FCD422BBC8E27009EE67D /* ObservableAUParameter.swift in Sources */,
+				5EAD02B32BD6C55E00828561 /* SystemConfig.swift in Sources */,
 				5EE5C05D2BCAA00000673E54 /* SC55Buttons.swift in Sources */,
 				5EE5C05F2BCAA04500673E54 /* JV880Buttons.swift in Sources */,
 				5E9FCD252BBC8E27009EE67D /* CrossPlatform.swift in Sources */,
@@ -675,9 +682,7 @@
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = (
-					"../../src",
-				);
+				HEADER_SEARCH_PATHS = ../../src;
 				INFOPLIST_FILE = sc55AU2Extension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = sc55AU2Extension;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -686,9 +691,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"../../build",
-				);
+				LIBRARY_SEARCH_PATHS = ../../build;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = giulioz.sc55AU2.sc55AU2Extension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -712,9 +715,7 @@
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = (
-					"../../src",
-				);
+				HEADER_SEARCH_PATHS = ../../src;
 				INFOPLIST_FILE = sc55AU2Extension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = sc55AU2Extension;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -723,9 +724,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"../../build",
-				);
+				LIBRARY_SEARCH_PATHS = ../../build;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = giulioz.sc55AU2.sc55AU2Extension;
 				PRODUCT_NAME = "$(TARGET_NAME)";

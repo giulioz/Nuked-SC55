@@ -895,7 +895,7 @@ void MCU::MCU_Write(uint32_t address, uint8_t value)
         }
         else
         {
-            printf("Unknown write %x %x\n", address, value);
+            // printf("Unknown write %x %x\n", address, value);
         }
     }
     else if (page == 5 && mcu_mk1)
@@ -1349,6 +1349,13 @@ int MCU::startSC55(std::string *basePath)
     pcm.PCM_Reset();
     mcu_timer.TIMER_Reset();
 
+    std::string nvramFilePath = *basePath + "/nvram.bin";
+    FILE *nvramFile = fopen(nvramFilePath.c_str(), "rb");
+    if (nvramFile) {
+        fread(nvram, 1, 0x8000, nvramFile);
+        fclose(nvramFile);
+    }
+
     sample_write_ptr = 0;
 
     return 0;
@@ -1414,7 +1421,7 @@ void MCU::updateSC55WithSampleRate(float *dataL, float *dataR, unsigned int nFra
     int inUsedL = 0;
     int inUsedR = 0;
     resample_process(resampleL, ratio, sample_buffer_l, renderBufferFrames, false, &inUsedL, dataL, nFrames);
-    resample_process(resampleR, ratio, sample_buffer_r, renderBufferFrames, false, &inUsedR, dataR, nFrames); 
+    resample_process(resampleR, ratio, sample_buffer_r, renderBufferFrames, false, &inUsedR, dataR, nFrames);
 }
 
 void MCU::SC55_Reset() {

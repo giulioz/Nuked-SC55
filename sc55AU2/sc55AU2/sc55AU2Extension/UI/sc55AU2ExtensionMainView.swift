@@ -13,7 +13,8 @@ struct sc55AU2ExtensionMainView: View {
     
     var body: some View {
         TabView {
-            EmulatorView(audioUnit: audioUnit).tabItem { Text("Emulator") }
+            // EmulatorView(audioUnit: audioUnit).tabItem { Text("Emulator") }
+            SystemConfig(audioUnit: audioUnit).tabItem { Text("System") }
         }
     }
 }

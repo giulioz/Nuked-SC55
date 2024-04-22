@@ -14,4 +14,5 @@
 - (uint32_t*)LCD_Update;
 - (void)LCD_SendButton:(uint8_t)button :(int)state;
 - (void)MCU_EncoderTrigger:(int) dir;
+- (void)MCU_PostUART:(uint8_t) data;
 @end
