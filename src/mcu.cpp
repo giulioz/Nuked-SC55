@@ -43,6 +43,7 @@
 #include "submcu.h"
 #include "utf8main.h"
 #include "utils/files.h"
+#include "../3rdparty/libresample/include/libresample.h"
 
 #if __linux__
 #include <unistd.h>
@@ -1419,6 +1420,39 @@ int MCU::updateSC55(int32_t *data, unsigned int dataSize) {
     // }
 
     return 0;
+}
+
+void MCU::updateSC55WithSampleRate(float *dataL, float *dataR, unsigned int nFrames, int destSampleRate) {
+    const unsigned int renderBufferFrames = ceil((double)nFrames / destSampleRate * 64000);
+    int32_t *renderBuffer = (int32_t *)malloc(renderBufferFrames * 4 * 2);
+    updateSC55(renderBuffer, renderBufferFrames * 4 * 2);
+
+    float* renderBufferFloatL = (float *)malloc(renderBufferFrames * 4);
+    float* renderBufferFloatR = (float *)malloc(renderBufferFrames * 4);
+    for (size_t i = 0; i < renderBufferFrames; i++) {
+        renderBufferFloatL[i] = renderBuffer[i * 2 + 0] / 2147483648.0;
+        renderBufferFloatR[i] = renderBuffer[i * 2 + 1] / 2147483648.0;
+    }
+
+    double ratio = (double)destSampleRate / 64000;
+    if (savedDestSampleRate != destSampleRate) {
+        savedDestSampleRate = destSampleRate;
+        if (resampleL) resample_close(resampleL);
+        if (resampleR) resample_close(resampleR);
+        resampleL = resample_open(1, ratio, ratio);
+        resampleR = resample_open(1, ratio, ratio);
+    }
+
+    int inUsedL = 0;
+    int inUsedR = 0;
+    resample_process(resampleL, ratio, renderBufferFloatL, renderBufferFrames, false, &inUsedL, dataL, nFrames);
+    resample_process(resampleR, ratio, renderBufferFloatR, renderBufferFrames, false, &inUsedR, dataR, nFrames);
+
+    // for (size_t i = 0; i < nFrames; i++) {
+    //     unsigned int srcI = (unsigned int)((float)i / destSampleRate * 64000);
+    //     dataL[i] = renderBuffer[srcI * 2 + 0] / 2147483648.0;
+    //     dataR[i] = renderBuffer[srcI * 2 + 1] / 2147483648.0;
+    // }
 }
 
 void MCU::SC55_Reset() {

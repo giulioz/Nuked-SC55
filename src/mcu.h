@@ -344,6 +344,10 @@ struct MCU {
     MCU_Timer mcu_timer;
     SubMcu sub_mcu;
 
+    void* resampleL = 0;
+    void* resampleR = 0;
+    int savedDestSampleRate = 0;
+
     MCU();
 
     void MCU_ErrorTrap(void);
@@ -368,6 +372,7 @@ struct MCU {
 
     int startSC55(std::string *basepath);
     int updateSC55(int32_t *data, unsigned int dataSize);
+    void updateSC55WithSampleRate(float *dataL, float *dataR, unsigned int nFrames, int destSampleRate);
     void postMidiSC55(uint8_t* message, int length);
     void SC55_Reset();
 

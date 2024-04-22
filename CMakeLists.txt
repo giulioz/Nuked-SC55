@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.2...3.5)
-project (NukedSC55 VERSION 0.2.0 LANGUAGES CXX)
+project (NukedSC55 VERSION 0.2.0 LANGUAGES C CXX)
 
 include(FindPkgConfig)
 include(GNUInstallDirs)
@@ -44,9 +44,14 @@ set(SC55_SRC
     src/submcu.cpp src/submcu.h
 
     src/utils/files.cpp src/utils/files.h
+    3rdparty/libresample/src/filterkit.c
+    3rdparty/libresample/src/resample.c
+    3rdparty/libresample/src/resamplesubs.c
 )
 
 add_library(nuked-sc55 STATIC ${SC55_SRC} ${UTF8MAIN_SRCS})
+
+target_include_directories(nuked-sc55 PRIVATE 3rdparty/libresample/include)
 
 set(SC55_INSTALL_FILES)
 

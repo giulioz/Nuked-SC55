@@ -15,11 +15,6 @@
 #import "sc55AU2ExtensionParameterAddresses.h"
 #import <mcu.h>
 
-OSStatus EncoderDataProc(AudioConverterRef inAudioConverter, UInt32 *ioNumberDataPackets,
-                AudioBufferList *ioData,
-                AudioStreamPacketDescription **outDataPacketDescription,
-                void *inUserData);
-
 /*
  sc55AU2ExtensionDSPKernel
  As a non-ObjC class, this is safe to use from render thread.
@@ -31,20 +26,6 @@ public:
         printf("Init %d\n", nInits);
 
         destFormat = *outputFormat;
-
-        AudioStreamBasicDescription sourceDescription;
-//        sourceDescription.mSampleRate = 66207;
-        sourceDescription.mSampleRate = 64000;
-        sourceDescription.mBytesPerFrame = 8;
-        sourceDescription.mBitsPerChannel = 32;
-        sourceDescription.mFormatID = kAudioFormatLinearPCM;
-        sourceDescription.mBytesPerPacket = 8;
-        sourceDescription.mChannelsPerFrame = 2;
-        sourceDescription.mFormatFlags = kAudioFormatFlagIsSignedInteger;
-        sourceDescription.mFramesPerPacket = 1;
-        sourceDescription.mReserved = 0;
-
-        AudioConverterNew(&sourceDescription, &destFormat, &audioConverterRef);
 
         auto path = std::string(NSBundle.mainBundle.bundleURL.absoluteString.UTF8String).substr(7) + "Contents/Resources";
         mcu = new MCU();
@@ -114,11 +95,9 @@ public:
     void process(AUAudioFrameCount frameCount, AudioBufferList* outBufferList) {
         auto start = std::chrono::high_resolution_clock::now();
 
-        UInt32 ioOutputDataPackets = frameCount * destFormat.mFramesPerPacket;
-        AudioConverterFillComplexBuffer(audioConverterRef, EncoderDataProc,
-                                        (void *)this, &ioOutputDataPackets,
-                                        outBufferList, NULL);
-
+        mcu->updateSC55WithSampleRate((float*)outBufferList->mBuffers[0].mData,
+                                      (float*)outBufferList->mBuffers[1].mData,
+                                      frameCount, destFormat.mSampleRate);
 
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
@@ -191,38 +170,10 @@ public:
     bool mBypassed = false;
     AUAudioFrameCount mMaxFramesToRender = 1024;
 
-    AudioConverterRef audioConverterRef;
     AudioStreamBasicDescription destFormat;
-
-    int32_t *lastBufferData;
 
     int nInits = 0;
     
 public:
     MCU *mcu;
 };
-
-OSStatus EncoderDataProc(AudioConverterRef inAudioConverter, UInt32 *ioNumberDataPackets,
-                AudioBufferList *ioData,
-                AudioStreamPacketDescription **outDataPacketDescription,
-                void *inUserData) {
-  sc55AU2ExtensionDSPKernel *_this = (sc55AU2ExtensionDSPKernel *)inUserData;
-
-  if (_this->lastBufferData) {
-    free(_this->lastBufferData);
-  }
-
-  unsigned int amountToWrite = *ioNumberDataPackets;
-
-  unsigned int dataSize = amountToWrite * 2 * 4;
-  int32_t *dataBuff = (int32_t *)malloc(dataSize);
-//   memset(dataBuff, 0, dataSize);
-  _this->mcu->updateSC55(dataBuff, dataSize);
-  _this->lastBufferData = dataBuff;
-
-  ioData->mNumberBuffers = 1;
-  ioData->mBuffers[0].mData = dataBuff;
-  ioData->mBuffers[0].mDataByteSize = dataSize;
-
-  return 0;
-}
