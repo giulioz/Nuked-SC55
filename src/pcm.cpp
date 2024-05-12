@@ -199,7 +199,7 @@ void PCM_Write(uint32_t address, uint8_t data)
 
             switch (ix)
             {
-                case 0: pcm.ram2[pcm.select_channel].pitch = (int)((float)pcm.write_latch * (32.0/44.1)); break;
+                case 0: pcm.ram2[pcm.select_channel].pitch = pcm.write_latch; break;
                 case 1: pcm.ram2[pcm.select_channel].pan = pcm.write_latch; break;
                 case 2: pcm.ram2[pcm.select_channel].revChorSend = pcm.write_latch; break;
                 case 3: pcm.ram2[pcm.select_channel].volume1 = pcm.write_latch; break;
