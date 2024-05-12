@@ -1136,7 +1136,10 @@ void updateSlot(int slot, bool is_last_slot, int voice_active, int *rcadd, int *
     int xor1 = (altLoopState ^ !nibble_cmp1);
     int nibble_add = altLoop ? check1 && xor1 : (!nibble_cmp1 && check1);
     int nibble_subtract = altLoop && !xor1 && active && !xor2;
-    wave_address += nibble_add - nibble_subtract;
+    if (backwardsPlay)
+        wave_address -= nibble_add - nibble_subtract;
+    else
+        wave_address += nibble_add - nibble_subtract;
     wave_address &= 0xfffff;
 
     int newnibble = PCM_ReadROM((hiaddr << 20) | wave_address);
