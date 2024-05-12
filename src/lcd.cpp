@@ -528,6 +528,18 @@ void LCD_Update(void)
                 MCU_EncoderTrigger(0);
             if (sdl_event.key.keysym.scancode == SDL_SCANCODE_PERIOD)
                 MCU_EncoderTrigger(1);
+            if (sdl_event.key.keysym.scancode == SDL_SCANCODE_7)
+            {
+                MCU_PostUART(0x90);
+                MCU_PostUART(0x32);
+                MCU_PostUART(0x7f);
+            }
+            if (sdl_event.key.keysym.scancode == SDL_SCANCODE_9)
+            {
+                MCU_PostUART(0x80);
+                MCU_PostUART(0x32);
+                MCU_PostUART(0x00);
+            }
         }
 
         switch (sdl_event.type)

@@ -209,10 +209,6 @@ endif()
 add_executable(nuked-sc55 ${SC55_SRC} ${UTF8MAIN_SRCS})
 set_nopie(nuked-sc55)
 
-if(MSVC)
-    target_compile_definitions(nuked-sc55 PRIVATE WIN32_CONSOLE)
-endif()
-
 if(TARGET SDL2::SDL2)
     target_link_libraries(nuked-sc55 PRIVATE SDL2::SDL2)
 else()
@@ -237,7 +233,7 @@ endif()
 
 if(APPLE)
     find_library(LIBCoreAudio CoreAudio)
-    target_link_libraries(nuked-sc55 PRIVATE ${LIBCoreAudio})
+    target_link_libraries(nuked-sc55 PRIVATE ${LIBCoreAudio} ncurses)
 endif()
 
 

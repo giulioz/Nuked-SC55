@@ -34,6 +34,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #include "mcu.h"
 #include "mcu_interrupt.h"
 #include "pcm.h"
@@ -80,6 +81,8 @@ uint8_t PCM_ReadROM(uint32_t address)
 
 void PCM_Write(uint32_t address, uint8_t data)
 {
+    // printf("%ld: PCM_Write: %02x %02x\n", time(NULL), address, data);
+
     address &= 0x3f;
     if (address < 0x4) // voice enable
     {
@@ -162,7 +165,17 @@ void PCM_Write(uint32_t address, uint8_t data)
             if ((address & 4) == 0)
                 ix |= 2;
 
-            pcm.ram1[pcm.select_channel][ix] = pcm.write_latch;
+            switch (ix)
+            {
+                case 0: pcm.ram1[pcm.select_channel].addressEnd = pcm.write_latch; break;
+                case 1: pcm.ram1[pcm.select_channel].filterTempHPF = pcm.write_latch; break;
+                case 2: pcm.ram1[pcm.select_channel].addressLoop = pcm.write_latch; break;
+                case 3: pcm.ram1[pcm.select_channel].filterTempLPF = pcm.write_latch; break;
+                case 4: pcm.ram1[pcm.select_channel].address = pcm.write_latch; break;
+                case 5: pcm.ram1[pcm.select_channel].tempReference = pcm.write_latch; break;
+                case 6: pcm.ram1[pcm.select_channel].v6 = pcm.write_latch; break;
+                case 7: pcm.ram1[pcm.select_channel].v7 = pcm.write_latch; break;
+            }
         }
     }
     else if ((address >= 0x10 && address < 0x20) || (address >= 0x30 && address < 0x38))
@@ -184,7 +197,25 @@ void PCM_Write(uint32_t address, uint8_t data)
             if (address & 32)
                 ix |= 8;
 
-            pcm.ram2[pcm.select_channel][ix] = pcm.write_latch;
+            switch (ix)
+            {
+                case 0: pcm.ram2[pcm.select_channel].pitch = (int)((float)pcm.write_latch * (32.0/44.1)); break;
+                case 1: pcm.ram2[pcm.select_channel].pan = pcm.write_latch; break;
+                case 2: pcm.ram2[pcm.select_channel].revChorSend = pcm.write_latch; break;
+                case 3: pcm.ram2[pcm.select_channel].volume1 = pcm.write_latch; break;
+                case 4: pcm.ram2[pcm.select_channel].volume2 = pcm.write_latch; break;
+                case 5: pcm.ram2[pcm.select_channel].cutoff = pcm.write_latch; break;
+                case 6: pcm.ram2[pcm.select_channel].resonanceFlags = pcm.write_latch; break;
+                case 7: pcm.ram2[pcm.select_channel].addrLoopFlags = pcm.write_latch; break;
+                case 8: pcm.ram2[pcm.select_channel].subPhaseState = pcm.write_latch; break;
+                case 9: pcm.ram2[pcm.select_channel].volume1TV = pcm.write_latch; break;
+                case 10: pcm.ram2[pcm.select_channel].volume2TV = pcm.write_latch; break;
+                case 11: pcm.ram2[pcm.select_channel].cutoffTV = pcm.write_latch; break;
+                case 12: pcm.ram2[pcm.select_channel].v12 = pcm.write_latch; break;
+                case 13: pcm.ram2[pcm.select_channel].v13 = pcm.write_latch; break;
+                case 14: pcm.ram2[pcm.select_channel].v14 = pcm.write_latch; break;
+                case 15: pcm.ram2[pcm.select_channel].v15 = pcm.write_latch; break;
+            }
         }
     }
 }
@@ -194,6 +225,8 @@ void PCM_Write(uint32_t address, uint8_t data)
 
 uint8_t PCM_Read(uint32_t address)
 {
+    // printf("%ld: PCM_Read: %02x\n", time(NULL), address);
+
     address &= 0x3f;
     //printf("PCM Read: %.2x\n", address);
 
@@ -237,7 +270,17 @@ uint8_t PCM_Read(uint32_t address)
             if ((address & 4) == 0)
                 ix |= 2;
 
-            pcm.read_latch = pcm.ram1[pcm.select_channel][ix];
+            switch (ix)
+            {
+                case 0: pcm.read_latch = pcm.ram1[pcm.select_channel].addressEnd; break;
+                case 1: pcm.read_latch = pcm.ram1[pcm.select_channel].filterTempHPF; break;
+                case 2: pcm.read_latch = pcm.ram1[pcm.select_channel].addressLoop; break;
+                case 3: pcm.read_latch = pcm.ram1[pcm.select_channel].filterTempLPF; break;
+                case 4: pcm.read_latch = pcm.ram1[pcm.select_channel].address; break;
+                case 5: pcm.read_latch = pcm.ram1[pcm.select_channel].tempReference; break;
+                case 6: pcm.read_latch = pcm.ram1[pcm.select_channel].v6; break;
+                case 7: pcm.read_latch = pcm.ram1[pcm.select_channel].v7; break;
+            }
         }
     }
     else if ((address >= 0x10 && address < 0x20) || (address >= 0x30 && address < 0x38))
@@ -248,7 +291,25 @@ uint8_t PCM_Read(uint32_t address)
             if (address & 32)
                 ix |= 8;
 
-            pcm.read_latch = pcm.ram2[pcm.select_channel][ix];
+            switch (ix)
+            {
+                case 0: pcm.read_latch = pcm.ram2[pcm.select_channel].pitch; break;
+                case 1: pcm.read_latch = pcm.ram2[pcm.select_channel].pan; break;
+                case 2: pcm.read_latch = pcm.ram2[pcm.select_channel].revChorSend; break;
+                case 3: pcm.read_latch = pcm.ram2[pcm.select_channel].volume1; break;
+                case 4: pcm.read_latch = pcm.ram2[pcm.select_channel].volume2; break;
+                case 5: pcm.read_latch = pcm.ram2[pcm.select_channel].cutoff; break;
+                case 6: pcm.read_latch = pcm.ram2[pcm.select_channel].resonanceFlags; break;
+                case 7: pcm.read_latch = pcm.ram2[pcm.select_channel].addrLoopFlags; break;
+                case 8: pcm.read_latch = pcm.ram2[pcm.select_channel].subPhaseState; break;
+                case 9: pcm.read_latch = pcm.ram2[pcm.select_channel].volume1TV; break;
+                case 10: pcm.read_latch = pcm.ram2[pcm.select_channel].volume2TV; break;
+                case 11: pcm.read_latch = pcm.ram2[pcm.select_channel].cutoffTV; break;
+                case 12: pcm.read_latch = pcm.ram2[pcm.select_channel].v12; break;
+                case 13: pcm.read_latch = pcm.ram2[pcm.select_channel].v13; break;
+                case 14: pcm.read_latch = pcm.ram2[pcm.select_channel].v14; break;
+                case 15: pcm.read_latch = pcm.ram2[pcm.select_channel].v15; break;
+            }
         }
     }
     else if (address >= 0x39 && address <= 0x3b)
@@ -270,6 +331,10 @@ uint8_t PCM_Read(uint32_t address)
 void PCM_Reset(void)
 {
     memset(&pcm, 0, sizeof(pcm));
+    pcm.ram1VoiceSumming = (Ram1Summing*)&pcm.ram1[30];
+    pcm.ram2VoiceSumming = &pcm.ram2[30];
+    pcm.ram1VoiceChorusSum = (Ram1Chorus*)&pcm.ram1[31];
+    pcm.ram2VoiceChorusSum = &pcm.ram2[31];
 }
 
 inline uint32_t addclip20(uint32_t add1, uint32_t add2, uint32_t cin)
@@ -337,7 +402,7 @@ inline void calc_tv(int e, int adjust, uint16_t *levelcur, int active, int *volm
                 
     int w1 = (speed & 0xf0) == 0;
     int w2 = w1 || (speed & 0x10) != 0;
-    int w3 = pcm.nfs &&
+    int w3 = pcm.not_first_sample &&
         ((speed & 0x80) == 0 || ((speed & 0x40) == 0 && (!w2 || (speed & 0x20) == 0)));
 
     int type = w2 | (w3 << 3);
@@ -428,7 +493,7 @@ inline void calc_tv(int e, int adjust, uint16_t *levelcur, int active, int *volm
         shifted -= sum1;
 
         int sum2 = (target << 11) + addlow + shifted;
-        if (write && pcm.nfs)
+        if (write && pcm.not_first_sample)
             *levelcur = (sum2 >> 4) & 0x7fff;
 
         if (e == 0)
@@ -468,7 +533,7 @@ inline void calc_tv(int e, int adjust, uint16_t *levelcur, int active, int *volm
         int neg2 = (sum3 & 0x80000) != 0;
         int xnor = !(neg2 ^ neg);
 
-        if (write && pcm.nfs)
+        if (write && pcm.not_first_sample)
         {
             if (xnor)
                 *levelcur = sum2_l & 0x7fff;
@@ -522,1050 +587,1006 @@ inline void eram_pack(int addr, int val)
     pcm.eram[addr] = data;
 }
 
+uint8_t noise_mask_lut[256] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x03, 0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x03, 0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x03, 0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x03, 0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x07, 0x07, 0x07, 0x07, 0x0f, 0x0f, 0x0f, 0x0f};
+uint16_t orval_lut[256] = {0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0040, 0x0100, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x0000, 0x0100, 0x0400, 0x0000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000, 0x1000, 0x1100, 0x1400, 0x1000};
+uint8_t write_mask_lut[256] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f};
+// uint32_t dac_mask_lut[256] = {0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffffc, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0};
+
+void finalMixing()
+{
+    int out_sample[2] = {};
+
+    int noise_mask = noise_mask_lut[pcm.config_reg_3c];
+    int orval = orval_lut[pcm.config_reg_3c];
+    int write_mask = write_mask_lut[pcm.config_reg_3c];
+    // int dac_mask = dac_mask_lut[pcm.config_reg_3c];
+
+    int shifter = pcm.ram2VoiceSumming->volume2TV;
+    int xr;
+
+    // Sample 1
+    {
+        xr = ((shifter >> 0) ^ (shifter >> 1) ^ (shifter >> 7) ^ (shifter >> 12)) & 1;
+        shifter = (shifter >> 1) | (xr << 15);
+        pcm.ram2VoiceSumming->volume2TV = shifter;
+
+        pcm.accum_l = addclip20(pcm.accum_l, pcm.ram1VoiceSumming->prevL, 0);
+        pcm.accum_r = addclip20(pcm.accum_r, pcm.ram1VoiceSumming->prevR, 0);
+
+        pcm.ram1VoiceSumming->newL = addclip20(pcm.accum_l, orval | (shifter & noise_mask), 0);
+        pcm.ram1VoiceSumming->newR = addclip20(pcm.accum_r, orval | (shifter & noise_mask), 0);
+
+        pcm.ram1VoiceSumming->prevL = pcm.accum_l & write_mask;
+        pcm.ram1VoiceSumming->prevR = pcm.accum_r & write_mask;
+        
+
+        out_sample[0] = (int)((pcm.ram1VoiceSumming->newL & ~write_mask) << 12);
+        out_sample[1] = (int)((pcm.ram1VoiceSumming->newR & ~write_mask) << 12);
+        MCU_PostSample(out_sample);
+    }
+
+    // Sample 2 (oversampling)
+    {
+        xr = ((shifter >> 0) ^ (shifter >> 1) ^ (shifter >> 7) ^ (shifter >> 12)) & 1;
+        shifter = (shifter >> 1) | (xr << 15);
+
+        pcm.accum_l = addclip20(pcm.accum_l, pcm.ram1VoiceSumming->prevL, 0);
+        pcm.accum_r = addclip20(pcm.accum_r, pcm.ram1VoiceSumming->prevR, 0);
+
+        pcm.ram1VoiceSumming->osL = addclip20(pcm.accum_l, orval | (shifter & noise_mask), 0);
+        pcm.ram1VoiceSumming->osR = addclip20(pcm.accum_r, orval | (shifter & noise_mask), 0);
+
+        if (pcm.config_reg_3c & 0x40) // oversampling
+        {
+            pcm.ram2VoiceSumming->volume2TV = shifter;
+
+            pcm.ram1VoiceSumming->prevL = pcm.accum_l & write_mask;
+            pcm.ram1VoiceSumming->prevR = pcm.accum_r & write_mask;
+
+
+            out_sample[0] = (int)((pcm.ram1VoiceSumming->osL & ~write_mask) << 12);
+            out_sample[1] = (int)((pcm.ram1VoiceSumming->osR & ~write_mask) << 12);
+            MCU_PostSample(out_sample);
+        }
+    }
+}
+
+void updateChorusReverb(int *rcadd, int *rcadd2)
+{
+    { // fixme
+        if (pcm.ram2[31].subPhaseState & 0x8000)
+            pcm.ram2[31].volume1TV = pcm.ram2[31].subPhaseState & 0x7fff;
+        else
+            pcm.ram2[31].volume2TV = pcm.ram2[31].subPhaseState & 0x7fff;
+
+        if ((0x4000 - pcm.ram2[31].subPhaseState) & 0x8000)
+            pcm.ram2[31].volume2TV = (0x4000 - pcm.ram2[31].subPhaseState) & 0x7fff;
+        else
+            pcm.ram2[31].volume1TV = (0x4000 - pcm.ram2[31].subPhaseState) & 0x7fff;
+    }
+
+    {
+        int v1 = pcm.ram2[31].pan;
+
+        int m1 = multi(pcm.ram1[29].filterTempHPF, v1 >> 8) >> 5; // 14
+        int m2 = multi(pcm.rcsum[1], v1 & 255) >> 5; // 15
+
+        pcm.ram1[29].filterTempHPF = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1); // 16
+    }
+
+    {
+        int okey = (pcm.ram2[31].addrLoopFlags & 0x20) != 0;
+        int key = 1;
+        int active = okey && key;
+        int u = 0;
+        calc_tv(1, pcm.ram2VoiceSumming->pitch, &pcm.ram2VoiceSumming->volume1TV, active, &u);
+    }
+
+    {
+        int v1 = pcm.ram2VoiceSumming->pan;
+        int m1 = multi(pcm.ram1[29].addressEnd, v1 >> 8) >> 5; // 17
+        int m2 = multi(pcm.rcsum[0], v1 & 255) >> 5; // 18
+
+        pcm.ram1[29].addressEnd = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1); // 19
+    }
+
+    {
+        {
+            // 1
+            int v1 = pcm.ram2VoiceSumming->volume2;
+            int m1 = multi(pcm.ram1[29].addressEnd, (v1 >> 8)) >> 6;
+            int v2 = 0;
+            int s1 = eram_unpack(pcm.ram2[28].pan + pcm.tv_counter, 1);
+            int s2 = eram_unpack(pcm.ram2[28].pan + pcm.tv_counter);
+            if ((v1 & 0x30) != 0)
+            {
+                v2 = s1;
+            }
+            int v3 = addclip20(m1, v2 ^ 0xfffff, 1);
+            pcm.ram1[29].address = v3;
+            int m2 = multi(v3, v1 & 255) >> 5;
+            pcm.ram1[29].tempReference = addclip20(m2 >> 1, s2, m2 & 1);
+        }
+        {
+            // 2
+            int v1 = pcm.ram2VoiceSumming->volume2;
+            int v2 = 0;
+            int s1 = eram_unpack(pcm.ram2[28].revChorSend + pcm.tv_counter, 1);
+            int s2 = eram_unpack(pcm.ram2[28].revChorSend + pcm.tv_counter);
+            if ((v1 & 0x30) != 0)
+            {
+                v2 = s1;
+            }
+            int v3 = addclip20(pcm.ram1[29].tempReference, v2 ^ 0xfffff, 1);
+            pcm.ram1[29].tempReference = v3;
+            int m2 = multi(v3, v1 & 255) >> 5;
+            pcm.ram1[28].addressEnd = addclip20(m2 >> 1, s2, m2 & 1);
+        }
+        {
+            // 3
+            int v1 = pcm.ram2VoiceSumming->volume2;
+            int v2 = 0;
+            int s1 = eram_unpack(pcm.ram2[28].volume1 + pcm.tv_counter, 1);
+            int s2 = eram_unpack(pcm.ram2[28].volume1 + pcm.tv_counter);
+            if ((v1 & 0x30) != 0)
+            {
+                v2 = s1;
+            }
+            int v3 = addclip20(pcm.ram1[28].addressEnd, v2 ^ 0xfffff, 1);
+            pcm.ram1[28].addressEnd = v3;
+            int m2 = multi(v3, v1 & 255) >> 5;
+            pcm.ram1[28].filterTempHPF = addclip20(m2 >> 1, s2, m2 & 1);
+
+
+            pcm.ram1[28].addressLoop = eram_unpack(pcm.ram2[28].cutoff + pcm.tv_counter);
+        }
+        {
+            // 4
+            int v1 = pcm.ram2VoiceSumming->cutoff;
+            int v2 = 0;
+            int s1 = eram_unpack(pcm.ram2[28].volume2 + pcm.tv_counter, 1);
+            int s2 = eram_unpack(pcm.ram2[28].volume2 + pcm.tv_counter);
+            if ((v1 & 0x30) != 0)
+            {
+                v2 = s1;
+            }
+            int v3 = addclip20(pcm.ram1[28].filterTempHPF, v2 ^ 0xfffff, 1);
+            pcm.ram1[28].filterTempHPF = v3;
+            int m2 = multi(v3, v1 & 255) >> 5;
+            pcm.ram1[28].filterTempLPF = addclip20(m2 >> 1, s2, m2 & 1);
+
+
+            pcm.ram1[28].address = eram_unpack(pcm.ram2[29].pan + pcm.tv_counter);
+        }
+        {
+            // 5
+
+            int v1 = pcm.ram2VoiceSumming->addrLoopFlags;
+            int m1 = multi(pcm.ram1[29].addressLoop, (v1 >> 8)) >> 5;
+            int s1 = eram_unpack(pcm.ram2[29].pitch + pcm.tv_counter);
+            int m2 = multi(s1, v1 & 255) >> 5;
+            pcm.ram1[29].addressLoop = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1);
+
+            eram_pack(pcm.ram2[28].pitch + pcm.tv_counter, pcm.ram1[29].address);
+        }
+        {
+            // 6
+
+            int v1 = pcm.ram2VoiceSumming->subPhaseState;
+            int m1 = multi(pcm.ram1[29].filterTempLPF, (v1 >> 8)) >> 5;
+            int s1 = eram_unpack(pcm.ram2[29].subPhaseState + pcm.tv_counter);
+            int m2 = multi(s1, v1 & 255) >> 5;
+            pcm.ram1[29].filterTempLPF = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1);
+
+            eram_pack(pcm.ram2[28].pan + pcm.tv_counter, pcm.ram1[29].tempReference);
+
+            eram_pack(pcm.ram2[28].revChorSend + pcm.tv_counter, pcm.ram1[28].addressEnd);
+        }
+        {
+            // 7
+
+            int v1 = pcm.ram2VoiceSumming->volume1TV;
+            int v2 = pcm.ram1[28].filterTempLPF;
+            int m1 = multi(pcm.ram1[29].addressLoop, (v1 >> 8)) >> 5;
+            int m2 = multi(pcm.ram1[29].filterTempLPF, (v1 >> 8)) >> 5;
+            pcm.ram1[28].filterTempLPF = addclip20(v2, m1 >> 1, m1 & 1);
+            pcm.ram1[28].tempReference = addclip20(v2, m2 >> 1, m2 & 1);
+
+            eram_pack(pcm.ram2[28].volume1 + pcm.tv_counter, pcm.ram1[28].filterTempHPF);
+        }
+        {
+            // 8
+
+            int v1 = pcm.ram2VoiceSumming->resonanceFlags;
+            int m1 = multi(pcm.ram1[28].addressLoop, v1 >> 8) >> 5;
+
+            int v2 = addclip20(pcm.ram1[28].filterTempLPF, m1 >> 1, m1 & 1);
+            pcm.ram1[28].filterTempLPF = v2;
+            int m2 = multi(v2, v1 & 255) >> 5;
+            pcm.ram1[28].addressLoop = addclip20(pcm.ram1[28].addressLoop, m2 >> 1, m2 & 1);
+
+
+            pcm.ram1[28].filterTempHPF = eram_unpack(pcm.ram2[28].volume1TV + pcm.tv_counter);
+        }
+        {
+            // 9
+
+            int v1 = pcm.ram2VoiceSumming->resonanceFlags;
+            int m1 = multi(pcm.ram1[28].address, v1 >> 8) >> 5;
+
+            int v2 = addclip20(pcm.ram1[28].tempReference, m1 >> 1, m1 & 1);
+            pcm.ram1[28].tempReference = v2;
+            int m2 = multi(v2, v1 & 255) >> 5;
+            pcm.ram1[28].address = addclip20(pcm.ram1[28].address, m2 >> 1, m2 & 1);
+
+
+            pcm.ram1[29].address = eram_unpack(pcm.ram2[29].cutoff + pcm.tv_counter);
+        }
+        {
+            // 10
+
+            int v1 = pcm.ram2VoiceSumming->resonanceFlags;
+            int v2 = pcm.ram1[28].filterTempHPF;
+            int m1 = multi(v2, v1 >> 8) >> 5;
+            int s1 = eram_unpack(pcm.ram2[28].subPhaseState + pcm.tv_counter);
+            int v3 = addclip20(m1 >> 1, s1, m1 & 1);
+            pcm.ram1[28].filterTempHPF = v3;
+            int m2 = multi(v3, v1 & 255) >> 5;
+            pcm.ram1[29].tempReference = addclip20(m2 >> 1, v2, m2 & 1);
+
+            eram_pack(pcm.ram2[28].volume2 + pcm.tv_counter, pcm.ram1[28].filterTempLPF);
+        }
+        {
+            // 11
+
+            int v1 = pcm.ram2VoiceSumming->resonanceFlags;
+            int v2 = pcm.ram1[29].address;
+            int m1 = multi(v2, v1 >> 8) >> 5;
+            int s1 = eram_unpack(pcm.ram2[29].volume2 + pcm.tv_counter);
+            int v3 = addclip20(m1 >> 1, s1, m1 & 1);
+            pcm.ram1[29].address = v3;
+            int m2 = multi(v3, v1 & 255) >> 5;
+            pcm.ram1[28].addressEnd = addclip20(m2 >> 1, v2, m2 & 1);
+
+
+            eram_pack(pcm.ram2[28].cutoff + pcm.tv_counter, pcm.ram1[28].addressLoop);
+
+            eram_pack(pcm.ram2[29].pitch + pcm.tv_counter, pcm.ram1[28].tempReference);
+        }
+        {
+            // 12
+
+            pcm.ram1[28].tempReference = eram_unpack(pcm.ram2[28].resonanceFlags + pcm.tv_counter);
+        }
+
+        {
+            // 13
+
+            int s1 = eram_unpack(pcm.ram2[28].volume2TV + pcm.tv_counter);
+            pcm.ram1[28].tempReference = addclip20(pcm.ram1[28].tempReference, s1, 0);
+
+            pcm.ram1[28].addressLoop = eram_unpack(pcm.ram2[29].revChorSend + pcm.tv_counter);
+        }
+
+        {
+            // 14
+
+            int s1 = eram_unpack(pcm.ram2[29].resonanceFlags + pcm.tv_counter);
+            int t1 = addclip20(s1, pcm.ram1[28].addressLoop, 0); // 6
+
+            pcm.ram1[28].tempReference = addclip20(t1, pcm.ram1[28].tempReference, 0);
+
+            pcm.ram1[28].addressLoop = eram_unpack(pcm.ram2[28].addrLoopFlags + pcm.tv_counter);
+        }
+
+        {
+            // 15
+
+            int s1 = eram_unpack(pcm.ram2[28].cutoffTV + pcm.tv_counter);
+            pcm.ram1[28].addressLoop = addclip20(pcm.ram1[28].addressLoop, s1, 0);
+
+            pcm.ram1[28].filterTempLPF = eram_unpack(pcm.ram2[29].volume1 + pcm.tv_counter);
+        }
+
+        {
+            // 16
+
+            int s1 = eram_unpack(pcm.ram2[29].addrLoopFlags + pcm.tv_counter);
+            int t1 = addclip20(s1, pcm.ram1[28].addressLoop, 0);
+            pcm.ram1[28].addressLoop = addclip20(t1, pcm.ram1[28].filterTempLPF, 0);
+
+
+            eram_pack(pcm.ram2[29].pan + pcm.tv_counter, pcm.ram1[28].address);
+
+            eram_pack(pcm.ram2[28].subPhaseState + pcm.tv_counter, pcm.ram1[28].filterTempHPF);
+        }
+
+        {
+            // 17
+            int v1 = pcm.ram2VoiceSumming->revChorSend;
+            int v2 = pcm.ram1[28].tempReference;
+
+            int m1 = multi(v2, v1 >> 8) >> 5;
+
+            rcadd[0] = m1;
+
+            rcadd2[0] = multi(v2, v1 & 255) >> 5;
+
+            int t1 = eram_unpack(pcm.ram2[29].volume2TV + pcm.tv_counter + 1); //? 3a6e
+            eram_pack(pcm.ram2[28].volume1TV + pcm.tv_counter, pcm.ram1[29].tempReference);
+            pcm.ram1[29].tempReference = t1;
+        }
+
+        {
+            // 18
+            int v1 = pcm.ram2VoiceSumming->volume1;
+            int v2 = pcm.ram1[28].addressLoop;
+
+            int m1 = multi(v2, v1 >> 8) >> 5;
+
+            rcadd[1] = m1;
+
+            rcadd2[1] = multi(v2, v1 & 255) >> 5;
+
+            pcm.ram1[28].filterTempHPF = eram_unpack(pcm.ram2[29].cutoffTV + pcm.tv_counter + 1); //? 3a1e
+        }
+        {
+            // 19
+
+            int v1 = pcm.ram2[31].volume1TV;
+
+            int s1 = eram_unpack(pcm.ram2[29].volume2TV + pcm.tv_counter); //? 3a6d
+
+            eram_pack(pcm.ram2[29].volume2 + pcm.tv_counter, pcm.ram1[29].address);
+
+            int m1 = multi(s1, v1 >> 8) >> 5;
+            int m2 = multi(pcm.ram1[29].tempReference, v1 >> 8) >> 5;
+
+            int t2 = addclip20(s1, (m1 >> 1) ^ 0xfffff, 1);
+
+            pcm.ram1[29].tempReference = addclip20(t2, m2 >> 1, m2 & 1);
+        }
+        {
+            // 20
+
+            int v1 = pcm.ram2[31].volume2TV;
+
+            int s1 = eram_unpack(pcm.ram2[29].cutoffTV + pcm.tv_counter); //? 3a1d
+
+            eram_pack(pcm.ram2[29].cutoff + pcm.tv_counter, pcm.ram1[28].addressEnd);
+
+            int m1 = multi(s1, v1 >> 8) >> 5;
+            int m2 = multi(pcm.ram1[28].filterTempHPF, v1 >> 8) >> 5;
+
+            int t2 = addclip20(s1, (m1 >> 1) ^ 0xfffff, 1);
+
+            pcm.ram1[28].filterTempHPF = addclip20(t2, m2 >> 1, m2 & 1);
+
+            eram_pack(pcm.ram2[29].volume1TV + pcm.tv_counter, pcm.ram1[29].filterTempHPF);
+        }
+        {
+            // 21
+
+            int v1 = pcm.ram2[31].revChorSend;
+            int v2 = pcm.ram1[29].tempReference;
+
+            int m1 = multi(v2, v1 >> 8) >> 5;
+            int m2 = multi(v2, v1 & 255) >> 5;
+
+            rcadd[2] = m1;
+            rcadd2[2] = m2;
+        }
+        {
+            // 22
+
+            int v1 = pcm.ram2[31].volume1;
+            int v2 = pcm.ram1[29].tempReference;
+
+            int m1 = multi(v2, v1 >> 8) >> 5;
+            int m2 = multi(v2, v1 & 255) >> 5;
+
+            rcadd[3] = m1;
+            rcadd2[3] = m2;
+        }
+        {
+            // 23
+
+            int v1 = pcm.ram2[31].volume2;
+            int v2 = pcm.ram1[28].filterTempHPF;
+
+            int m1 = multi(v2, v1 >> 8) >> 5;
+            int m2 = multi(v2, v1 & 255) >> 5;
+
+            rcadd[4] = m1;
+            rcadd2[4] = m2;
+        }
+        {
+            // 31
+
+            int v1 = pcm.ram2[31].cutoff;
+            int v2 = pcm.ram1[28].filterTempHPF;
+
+            int m1 = multi(v2, v1 >> 8) >> 5;
+            int m2 = multi(v2, v1 & 255) >> 5;
+
+            rcadd[5] = m1;
+            rcadd2[5] = m2;
+
+            {
+                // address generator
+
+                int key = 1;
+                int okey = (pcm.ram2[31].addrLoopFlags & 0x20) != 0;
+                int active = key && okey;
+                int kon = key && !okey;
+
+                int altLoopState = (pcm.ram2[31].subPhaseState & 0x8000) != 0; // 0
+                int altLoop = (pcm.ram2[31].addrLoopFlags & 0x40) != 0; // 1
+                int backwardsPlay = (pcm.ram2[31].addrLoopFlags & 0x80) != 0; // 1
+                int old_nibble = (pcm.ram2[31].addrLoopFlags >> 12) & 15; // 1
+
+                int address = pcm.ram1VoiceChorusSum->address; // 0
+                int address_end = pcm.ram1VoiceChorusSum->addressEnd; // 1 or 2
+                int address_loop = pcm.ram1VoiceChorusSum->addressLoop; // 2 or 1
+
+                int sub_phase = (pcm.ram2[31].subPhaseState & 0x3fff); // 1
+                int interp_ratio = (sub_phase >> 7) & 127;
+                sub_phase += pcm.ram2[pcm.ram2[31].addrLoopFlags & 31].pitch; // 5
+                int sub_phase_of = (sub_phase >> 14) & 7;
+                if (pcm.not_first_sample)
+                {
+                    pcm.ram2[31].subPhaseState &= ~0x3fff;
+                    pcm.ram2[31].subPhaseState |= sub_phase & 0x3fff;
+                }
+
+
+                // address 0
+                int address_cnt = address;
+
+                int cmp1 = altLoopState ? address_loop : address_end;
+                int cmp2 = address_cnt;
+                int address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 9
+                int next_altLoopState = altLoopState;
+
+                int next_address = address_cnt; // 11
+
+                cmp1 = (!altLoop && address_cmp) ? address_loop : address_cnt;
+                cmp2 = address_cnt;
+                int address_cnt2 = (kon || (!altLoop && address_cmp)) ? cmp1 : cmp2;
+
+                int address_add = (!address_cmp && altLoop && !altLoopState) || (!address_cmp && !altLoop);
+                int address_sub = !address_cmp && altLoop && altLoopState;
+                if (backwardsPlay)
+                    address_cnt2 -= address_add - address_sub;
+                else
+                    address_cnt2 += address_add - address_sub;
+                address_cnt = address_cnt2 & 0xfffff; // 11
+                altLoopState = altLoop && (altLoopState ^ address_cmp); // 11
+
+                cmp1 = altLoopState ? address_loop : address_end;
+                cmp2 = address_cnt;
+                address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 13
+
+                if (sub_phase_of >= 1)
+                {
+                    next_address = address_cnt; // 13
+                    next_altLoopState = altLoopState;
+                }
+
+                if (active && pcm.not_first_sample)
+                    pcm.ram1VoiceChorusSum->address = next_address;
+
+                if (pcm.not_first_sample)
+                {
+                    pcm.ram2[31].subPhaseState &= ~0x8000;
+                    pcm.ram2[31].subPhaseState |= next_altLoopState << 15;
+                }
+
+                int t1 = address_loop; // 18
+                int t2 = pcm.ram1VoiceChorusSum->address - t1; // 19
+                int t3 = address_end - t2; // 20
+                int t4 = pcm.ram1VoiceChorusSum->address; // 23
+
+                pcm.ram2[29].volume2TV = t3;
+                pcm.ram2[29].cutoffTV = t4;
+            }
+        }
+    }
+}
+
+void updateSlot(int slot, bool is_last_slot, int voice_active, int *rcadd, int *rcadd2)
+{
+    Ram1VoiceInfo *ram1 = &pcm.ram1[slot];
+    Ram2VoiceInfo *ram2 = &pcm.ram2[slot];
+    int okey = (ram2->addrLoopFlags & 0x20) != 0;
+    int key = (voice_active >> slot) & 1;
+
+    int active = okey && key;
+    int kon = key && !okey;
+
+    // address generator
+
+    int altLoopState = (ram2->subPhaseState & 0x8000) != 0; // 0
+    int altLoop = (ram2->addrLoopFlags & 0x40) != 0; // 1
+    int backwardsPlay = (ram2->addrLoopFlags & 0x80) != 0; // 1
+    int hiaddr = (ram2->addrLoopFlags >> 8) & 15; // 1
+    int old_nibble = (ram2->addrLoopFlags >> 12) & 15; // 1
+
+    int address = ram1->address; // 0
+    int address_end = ram1->addressEnd; // 1 or 2
+    int address_loop = ram1->addressLoop; // 2 or 1
+
+    int cmp1 = altLoopState ? address_loop : address_end;
+    int cmp2 = address;
+    int nibble_cmp1 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 2
+    int irq_flag = 0;
+
+    // fixme:
+    if (kon)
+        irq_flag = ((cmp1 + address_loop) & 0x100000) != 0;
+    else
+        irq_flag = ((address + ((-address_loop) & 0xfffff)) & 0x100000) != 0;
+    irq_flag ^= backwardsPlay;
+
+    int nibble_address = (!altLoop && nibble_cmp1) ? address_loop : address; // 3
+    int address_b4 = (nibble_address & 0x10) != 0;
+    int wave_address = nibble_address >> 5;
+    int xor2 = (address_b4 ^ backwardsPlay);
+    int check1 = xor2 && active;
+    int xor1 = (altLoopState ^ !nibble_cmp1);
+    int nibble_add = altLoop ? check1 && xor1 : (!nibble_cmp1 && check1);
+    int nibble_subtract = altLoop && !xor1 && active && !xor2;
+    wave_address += nibble_add - nibble_subtract;
+    wave_address &= 0xfffff;
+
+    int newnibble = PCM_ReadROM((hiaddr << 20) | wave_address);
+    int newnibble_sel = address_b4 ^ ((altLoop || !nibble_cmp1) && okey);
+    if (newnibble_sel)
+        newnibble = (newnibble >> 4) & 15;
+    else
+        newnibble &= 15;
+
+    int sub_phase = (ram2->subPhaseState & 0x3fff); // 1
+    int interp_ratio = (sub_phase >> 7) & 127;
+    sub_phase += pcm.ram2[ram2->addrLoopFlags & 31].pitch; // 5
+    int sub_phase_of = (sub_phase >> 14) & 7;
+    if (pcm.not_first_sample)
+    {
+        ram2->subPhaseState &= ~0x3fff;
+        ram2->subPhaseState |= sub_phase & 0x3fff;
+    }
+
+
+    // address 0
+    int address_cnt = address;
+    int samp0 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 18
+
+    cmp1 = address;
+    cmp2 = address_cnt;
+    int nibble_cmp2 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 8
+    cmp1 = altLoopState ? address_loop : address_end;
+    cmp2 = address_cnt;
+    int address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 9
+
+    int next_address = address_cnt; // 11
+    int usenew = !nibble_cmp2;
+    int next_altLoopState = altLoopState;
+
+    cmp1 = (!altLoop && address_cmp) ? address_loop : address_cnt;
+    cmp2 = address_cnt;
+    int address_cnt2 = (kon || (!altLoop && address_cmp)) ? cmp1 : cmp2;
+
+    int address_add = (!address_cmp && altLoop && !altLoopState) || (!address_cmp && !altLoop);
+    int address_sub = !address_cmp && altLoop && altLoopState;
+    if (backwardsPlay)
+        address_cnt2 -= address_add - address_sub;
+    else
+        address_cnt2 += address_add - address_sub;
+    address_cnt = address_cnt2 & 0xfffff; // 11
+    altLoopState = altLoop && (altLoopState ^ address_cmp); // 11
+
+    int samp1 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 20
+
+    cmp1 = address;
+    cmp2 = address_cnt;
+    int nibble_cmp3 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 12
+    cmp1 = altLoopState ? address_loop : address_end;
+    cmp2 = address_cnt;
+    address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 13
+
+    if (sub_phase_of >= 1)
+    {
+        next_address = address_cnt; // 13
+        usenew = !nibble_cmp3;
+        next_altLoopState = altLoopState;
+    }
+
+    cmp1 = (!altLoop && address_cmp) ? address_loop : address_cnt;
+    cmp2 = address_cnt;
+    address_cnt2 = (kon || (!altLoop && address_cmp)) ? cmp1 : cmp2;
+
+    address_add = (!address_cmp && altLoop && !altLoopState) || (!address_cmp && !altLoop);
+    address_sub = !address_cmp && altLoop && altLoopState;
+    if (backwardsPlay)
+        address_cnt2 -= address_add - address_sub;
+    else
+        address_cnt2 += address_add - address_sub;
+    address_cnt = address_cnt2 & 0xfffff; // 15
+    altLoopState = altLoop && (altLoopState ^ address_cmp); // 15
+
+    int samp2 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 1
+
+    cmp1 = address;
+    cmp2 = address_cnt;
+    int nibble_cmp4 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 16
+    cmp1 = altLoopState ? address_loop : address_end;
+    cmp2 = address_cnt;
+    address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 17
+
+    if (sub_phase_of >= 2)
+    {
+        next_address = address_cnt; // 17
+        usenew = !nibble_cmp4;
+        next_altLoopState = altLoopState;
+    }
+
+    cmp1 = (!altLoop && address_cmp) ? address_loop : address_cnt;
+    cmp2 = address_cnt;
+    address_cnt2 = (kon || (!altLoop && address_cmp)) ? cmp1 : cmp2;
+
+    address_add = (!address_cmp && altLoop && !altLoopState) || (!address_cmp && !altLoop);
+    address_sub = !address_cmp && altLoop && altLoopState;
+    if (backwardsPlay)
+        address_cnt2 -= address_add - address_sub;
+    else
+        address_cnt2 += address_add - address_sub;
+    address_cnt = address_cnt2 & 0xfffff; // 19
+    altLoopState = altLoop && (altLoopState ^ address_cmp); // 19
+
+    int samp3 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 5
+
+    cmp1 = address;
+    cmp2 = address_cnt;
+    int nibble_cmp5 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 20
+    cmp1 = altLoopState ? address_loop : address_end;
+    cmp2 = address_cnt;
+    address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 21
+
+    if (sub_phase_of >= 3)
+    {
+        next_address = address_cnt; // 21
+        usenew = !nibble_cmp5;
+        next_altLoopState = altLoopState;
+    }
+
+    cmp1 = (!altLoop && address_cmp) ? address_loop : address_cnt;
+    cmp2 = address_cnt;
+    address_cnt2 = (kon || (!altLoop && address_cmp)) ? cmp1 : cmp2;
+
+    address_add = (!address_cmp && altLoop && !altLoopState) || (!address_cmp && !altLoop);
+    address_sub = !address_cmp && altLoop && altLoopState;
+    if (backwardsPlay)
+        address_cnt2 -= address_add - address_sub;
+    else
+        address_cnt2 += address_add - address_sub;
+    address_cnt = address_cnt2 & 0xfffff; // 23
+    // altLoopState = altLoop && (altLoopState ^ address_cmp); // 23
+
+    cmp1 = address;
+    cmp2 = address_cnt;
+    int nibble_cmp6 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 24
+
+    if (sub_phase_of >= 4)
+    {
+        next_address = address_cnt; // 1
+        usenew = !nibble_cmp6;
+        // altLoopState is not updated?
+    }
+
+    if (active && pcm.not_first_sample)
+        ram1->address = next_address;
+
+    if (pcm.not_first_sample)
+    {
+        ram2->subPhaseState &= ~0x8000;
+        ram2->subPhaseState |= next_altLoopState << 15;
+    }
+
+    // dpcm
+
+    // 18
+    int reference = ram1->tempReference;
+
+    // 19
+    int preshift = samp0 << 10;
+    int select_nibble = nibble_cmp2 ? old_nibble : newnibble;
+    int shift = (10 - select_nibble) & 15;
+
+    int shifted = (preshift << 1) >> shift;
+
+    if (sub_phase_of >= 1)
+        reference = addclip20(reference, shifted >> 1, shifted & 1);
+
+    preshift = samp1 << 10;
+    select_nibble = nibble_cmp3 ? old_nibble : newnibble;
+    shift = (10 - select_nibble) & 15;
+
+    shifted = (preshift << 1) >> shift;
+
+    if (sub_phase_of >= 2)
+        reference = addclip20(reference, shifted >> 1, shifted & 1);
+
+    preshift = samp2 << 10;
+    select_nibble = nibble_cmp4 ? old_nibble : newnibble;
+    shift = (10 - select_nibble) & 15;
+
+    shifted = (preshift << 1) >> shift;
+
+    if (sub_phase_of >= 3)
+        reference = addclip20(reference, shifted >> 1, shifted & 1);
+
+    preshift = samp3 << 10;
+    select_nibble = nibble_cmp5 ? old_nibble : newnibble;
+    shift = (10 - select_nibble) & 15;
+
+    shifted = (preshift << 1) >> shift;
+
+    if (sub_phase_of >= 4)
+        reference = addclip20(reference, shifted >> 1, shifted & 1);
+
+    // interpolation
+
+    int test = ram1->tempReference;
+
+    int step0 = multi(interp_lut[0][interp_ratio] << 6, samp0) >> 8;
+    select_nibble = nibble_cmp2 ? old_nibble : newnibble;
+    shift = (10 - select_nibble) & 15;
+    step0 =  (step0 << 1) >> shift;
+
+    test = addclip20(test, step0 >> 1, step0 & 1);
+
+
+    int step1 = multi(interp_lut[1][interp_ratio] << 6, samp1) >> 8;
+    select_nibble = nibble_cmp3 ? old_nibble : newnibble;
+    shift = (10 - select_nibble) & 15;
+    step1 = (step1 << 1) >> shift;
+
+    test = addclip20(test, step1 >> 1, step1 & 1);
+
+    int step2 = multi(interp_lut[2][interp_ratio] << 6, samp2) >> 8;
+    select_nibble = nibble_cmp4 ? old_nibble : newnibble;
+    shift = (10 - select_nibble) & 15;
+    step2 = (step2 << 1) >> shift;
+
+
+    test = addclip20(test, step2 >> 1, step2 & 1);
+
+    int lpfResult;
+    int resonance = (ram2->resonanceFlags >> 8) & 127;
+
+    if (mcu_mk1)
+    {
+        int mult1 = multi(ram1->filterTempHPF, ram2->cutoffTV >> 8); // 8
+        int mult2 = multi(ram1->filterTempHPF, (ram2->cutoffTV >> 1) & 127); // 9
+        int mult3 = multi(ram1->filterTempHPF, resonance); // 10
+
+        int v2 = addclip20(ram1->filterTempLPF, mult1 >> 6, (mult1 >> 5) & 1); // 9
+        int v1 = addclip20(v2, mult2 >> 13, (mult2 >> 12) & 1); // 10
+        int subvar = addclip20(v1, (mult3 >> 6), (mult3 >> 5) & 1); // 11
+
+        ram1->filterTempLPF = v1;
+
+        lpfResult = addclip20(test, subvar ^ 0xfffff, 1); // 12
+
+        int mult4 = multi(lpfResult, ram2->cutoffTV >> 8);
+        int mult5 = multi(lpfResult, (ram2->cutoffTV >> 1) & 127);
+        int v4 = addclip20(ram1->filterTempHPF, mult4 >> 6, (mult4 >> 5) & 1); // 14
+        int tempReference = addclip20(v4, mult5 >> 13, (mult5 >> 12) & 1); // 15
+
+        ram1->filterTempHPF = tempReference;
+    }
+    else
+    {
+        // hack: use 32-bit math to avoid overflow
+        int mult1 = ram1->filterTempHPF * (int8_t)(ram2->cutoffTV >> 8); // 8
+        int mult2 = ram1->filterTempHPF * (int8_t)((ram2->cutoffTV >> 1) & 127); // 9
+        int mult3 = ram1->filterTempHPF * (int8_t)resonance; // 10
+
+        int v2 = ram1->filterTempLPF + (mult1 >> 6) + ((mult1 >> 5) & 1); // 9
+        int v1 = v2 + (mult2 >> 13) + ((mult2 >> 12) & 1); // 10
+        int subvar = v1 + (mult3 >> 6) + ((mult3 >> 5) & 1); // 11
+
+        ram1->filterTempLPF = v1;
+
+        int tests = test;
+        tests <<= 12;
+        tests >>= 12;
+
+        lpfResult = tests - subvar; // 12
+
+        int mult4 = lpfResult * (int8_t)(ram2->cutoffTV >> 8);
+        int mult5 = lpfResult * (int8_t)((ram2->cutoffTV >> 1) & 127);
+        int v4 = ram1->filterTempHPF + (mult4 >> 6) + ((mult4 >> 5) & 1); // 14
+        int tempReference = v4 + (mult5 >> 13) + ((mult5 >> 12) & 1); // 15
+
+        ram1->filterTempHPF = tempReference;
+    }
+
+
+    ram1->tempReference = reference;
+
+    if (active && (ram2->resonanceFlags & 1) != 0 && (ram2->subPhaseState & 0x4000) == 0 && !pcm.irq_assert && irq_flag)
+    {
+        // printf("irq voice %i\n", slot);
+        if (pcm.not_first_sample)
+            ram2->subPhaseState |= 0x4000;
+        pcm.irq_assert = 1;
+        pcm.irq_channel = slot;
+        if (mcu_jv880)
+            MCU_GA_SetGAInt(5, 1);
+        else
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 1);
+    }
+
+    int volmul1 = 0;
+    int volmul2 = 0;
+
+    calc_tv(0, ram2->volume1, &ram2->volume1TV, active, &volmul1);
+    calc_tv(1, ram2->volume2, &ram2->volume2TV, active, &volmul2);
+    calc_tv(2, ram2->cutoff, &ram2->cutoffTV, active, NULL);
+
+    // if (volmul1 && volmul2)
+    //     volmul1 += 0;
+
+    int sample = (ram2->resonanceFlags & 2) == 0 ? ram1->filterTempLPF : lpfResult; // HPF or LPF
+    // sample = test;
+
+    int multiv1 = multi(sample, volmul1 >> 8);
+    int multiv2 = multi(sample, (volmul1 >> 1) & 127);
+
+    int sample2 = addclip20(multiv1 >> 6, multiv2 >> 13, ((multiv2 >> 12) | (multiv1 >> 5)) & 1);
+
+    int multiv3 = multi(sample2, volmul2 >> 8);
+    int multiv4 = multi(sample2, (volmul2 >> 1) & 127);
+
+    int sample3 = addclip20(multiv3 >> 6, multiv4 >> 13, ((multiv4 >> 12) | (multiv3 >> 5)) & 1);
+
+    int pan = active ? ram2->pan : 0;
+    int rc = active ? ram2->revChorSend : 0;
+
+    int sampl = multi(sample3, (pan >> 8) & 255);
+    int sampr = multi(sample3, (pan >> 0) & 255);
+
+    int rc0 = multi(sample3, (rc >> 8) & 255) >> 5; // reverb
+    int rc1 = multi(sample3, (rc >> 0) & 255) >> 5; // chorus
+    
+    // mix reverb/chorus?
+    int slot2 = is_last_slot ? 31 : slot + 1;
+    switch (slot2)
+    {
+        // 17, 18 - reverb
+
+        case 17:
+            pcm.ram1VoiceChorusSum->sumL = addclip20(pcm.ram1VoiceChorusSum->sumL, rcadd[0] >> 1, rcadd[0] & 1);
+            break;
+        case 18:
+            pcm.ram1VoiceChorusSum->sumR = addclip20(pcm.ram1VoiceChorusSum->sumR, rcadd[1] >> 1, rcadd[1] & 1);
+            break;
+        case 21:
+            pcm.ram1VoiceChorusSum->sumL = addclip20(pcm.ram1VoiceChorusSum->sumL, rcadd[2] >> 1, rcadd[2] & 1);
+            break;
+        case 22:
+            pcm.ram1VoiceChorusSum->sumR = addclip20(pcm.ram1VoiceChorusSum->sumR, rcadd[3] >> 1, rcadd[3] & 1);
+            break;
+        case 23:
+            pcm.ram1VoiceChorusSum->sumL = addclip20(pcm.ram1VoiceChorusSum->sumL, rcadd[4] >> 1, rcadd[4] & 1);
+            break;
+        case 31:
+            pcm.ram1VoiceChorusSum->sumR = addclip20(pcm.ram1VoiceChorusSum->sumR, rcadd[5] >> 1, rcadd[5] & 1);
+            break;
+    }
+
+    int suml = addclip20(pcm.ram1VoiceChorusSum->sumL, sampl >> 6, (sampl >> 5) & 1);
+    int sumr = addclip20(pcm.ram1VoiceChorusSum->sumR, sampr >> 6, (sampr >> 5) & 1);
+
+    switch (slot2)
+    {
+        case 17:
+            pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[0] >> 1, rcadd2[0] & 1);
+            break;
+        case 18:
+            pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[1] >> 1, rcadd2[1] & 1);
+            break;
+        case 21:
+            pcm.rcsum[0] = addclip20(pcm.rcsum[0], rcadd2[2] >> 1, rcadd2[2] & 1);
+            break;
+        case 22:
+            pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[3] >> 1, rcadd2[3] & 1);
+            break;
+        case 23:
+            pcm.rcsum[0] = addclip20(pcm.rcsum[0], rcadd2[4] >> 1, rcadd2[4] & 1);
+            break;
+        case 31:
+            pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[5] >> 1, rcadd2[5] & 1);
+            break;
+    }
+
+    pcm.rcsum[0] = addclip20(pcm.rcsum[0], rc0 >> 1, rc0 & 1);
+    pcm.rcsum[1] = addclip20(pcm.rcsum[1], rc1 >> 1, rc1 & 1);
+
+    if (!is_last_slot)
+    {
+        pcm.ram1VoiceChorusSum->sumL = suml;
+        pcm.ram1VoiceChorusSum->sumR = sumr;
+    }
+    else
+    {
+        pcm.accum_l = suml;
+        pcm.accum_r = sumr;
+    }
+
+    if (key && pcm.not_first_sample)
+    {
+        ram2->addrLoopFlags &= ~0xf020; // remove key
+        ram2->addrLoopFlags |= ((usenew || kon) ? newnibble : old_nibble) << 12; // set the nibble
+
+        // update key
+        ram2->addrLoopFlags |= key << 5;
+    }
+
+    if (!active)
+    {
+        if (pcm.not_first_sample)
+        {
+            ram1->filterTempHPF = 0;
+            ram1->filterTempLPF = 0;
+            ram1->tempReference = 0;
+        }
+
+        ram2->subPhaseState = 0;
+        ram2->volume1TV = 0;
+        ram2->volume2TV = 0;
+    }
+}
+
 void PCM_Update(uint64_t cycles)
 {
     int reg_slots = (pcm.config_reg_3d & 31) + 1;
     int voice_active = pcm.voice_mask & pcm.voice_mask_pending;
     while (pcm.cycles < cycles)
     {
-        int tt[2] = {};
-
-        { // final mixing
-            int noise_mask = 0;
-            int orval = 0;
-            int write_mask = 0;
-            int dac_mask = 0;
-            if ((pcm.config_reg_3c & 0x30) != 0)
-            {
-                switch ((pcm.config_reg_3c >> 2) & 3)
-                {
-                    case 1:
-                        noise_mask = 3;
-                        break;
-                    case 2:
-                        noise_mask = 7;
-                        break;
-                    case 3:
-                        noise_mask = 15;
-                        break;
-                }
-                switch (pcm.config_reg_3c & 3)
-                {
-                    case 1:
-                        orval |= 1 << 8;
-                        break;
-                    case 2:
-                        orval |= 1 << 10;
-                        break;
-                }
-                write_mask = 15;
-                dac_mask = ~15;
-            }
-            else
-            {
-                switch ((pcm.config_reg_3c >> 2) & 3)
-                {
-                    case 2:
-                        noise_mask = 1;
-                        break;
-                    case 3:
-                        noise_mask = 3;
-                        break;
-                }
-                switch (pcm.config_reg_3c & 3)
-                {
-                    case 1:
-                        orval |= 1 << 6;
-                        break;
-                    case 2:
-                        orval |= 1 << 8;
-                        break;
-                }
-                write_mask = 3;
-                dac_mask = ~3;
-            }
-            if ((pcm.config_reg_3c & 0x80) == 0)
-                write_mask = 0;
-            if ((pcm.config_reg_3c & 0x30) == 0x30)
-                orval |= 1 << 12;
-
-
-            int shifter = pcm.ram2[30][10];
-            int xr = ((shifter >> 0) ^ (shifter >> 1) ^ (shifter >> 7) ^ (shifter >> 12)) & 1;
-            shifter = (shifter >> 1) | (xr << 15);
-            pcm.ram2[30][10] = shifter;
-
-            pcm.accum_l = addclip20(pcm.accum_l, pcm.ram1[30][0], 0);
-            pcm.accum_r = addclip20(pcm.accum_r, pcm.ram1[30][1], 0);
-
-            pcm.ram1[30][2] = addclip20(pcm.accum_l,
-                orval | (shifter & noise_mask), 0);
-
-            pcm.ram1[30][4] = addclip20(pcm.accum_r,
-                orval | (shifter & noise_mask), 0);
-
-            pcm.ram1[30][0] = pcm.accum_l & write_mask;
-            pcm.ram1[30][1] = pcm.accum_r & write_mask;
-            
-
-            tt[0] = (int)((pcm.ram1[30][2] & ~write_mask) << 12);
-            tt[1] = (int)((pcm.ram1[30][4] & ~write_mask) << 12);
-
-            MCU_PostSample(tt);
-
-            xr = ((shifter >> 0) ^ (shifter >> 1) ^ (shifter >> 7) ^ (shifter >> 12)) & 1;
-            shifter = (shifter >> 1) | (xr << 15);
-
-            pcm.accum_l = addclip20(pcm.accum_l, pcm.ram1[30][0], 0);
-            pcm.accum_r = addclip20(pcm.accum_r, pcm.ram1[30][1], 0);
-
-            pcm.ram1[30][3] = addclip20(pcm.accum_l,
-                orval | (shifter & noise_mask), 0);
-
-            pcm.ram1[30][5] = addclip20(pcm.accum_r,
-                orval | (shifter & noise_mask), 0);
-
-            if (pcm.config_reg_3c & 0x40) // oversampling
-            {
-                pcm.ram2[30][10] = shifter;
-
-                pcm.ram1[30][0] = pcm.accum_l & write_mask;
-                pcm.ram1[30][1] = pcm.accum_r & write_mask;
-
-
-                tt[0] = (int)((pcm.ram1[30][3] & ~write_mask) << 12);
-                tt[1] = (int)((pcm.ram1[30][5] & ~write_mask) << 12);
-
-                MCU_PostSample(tt);
-            }
-        }
+        finalMixing();
 
         { // global counter for envelopes
-            if (!pcm.nfs)
-                pcm.tv_counter = pcm.ram2[31][8]; // fixme
+            if (!pcm.not_first_sample)
+                pcm.tv_counter = pcm.ram2[31].subPhaseState; // fixme
 
             pcm.tv_counter -= 1;
-
             pcm.tv_counter &= 0x3fff;
-        }
-
-        // chorus/reverb
-
-        { // fixme
-            if (pcm.ram2[31][8] & 0x8000)
-                pcm.ram2[31][9] = pcm.ram2[31][8] & 0x7fff;
-            else
-                pcm.ram2[31][10] = pcm.ram2[31][8] & 0x7fff;
-
-            if ((0x4000 - pcm.ram2[31][8]) & 0x8000)
-                pcm.ram2[31][10] = (0x4000 - pcm.ram2[31][8]) & 0x7fff;
-            else
-                pcm.ram2[31][9] = (0x4000 - pcm.ram2[31][8]) & 0x7fff;
-        }
-
-        {
-            int v1 = pcm.ram2[31][1];
-
-            int m1 = multi(pcm.ram1[29][1], v1 >> 8) >> 5; // 14
-            int m2 = multi(pcm.rcsum[1], v1 & 255) >> 5; // 15
-
-            pcm.ram1[29][1] = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1); // 16
-        }
-
-        {
-            int okey = (pcm.ram2[31][7] & 0x20) != 0;
-            int key = 1;
-            int active = okey && key;
-            int u = 0;
-            calc_tv(1, pcm.ram2[30][0], &pcm.ram2[30][9], active, &u);
-        }
-
-        {
-            int v1 = pcm.ram2[30][1];
-            int m1 = multi(pcm.ram1[29][0], v1 >> 8) >> 5; // 17
-            int m2 = multi(pcm.rcsum[0], v1 & 255) >> 5; // 18
-
-            pcm.ram1[29][0] = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1); // 19
         }
 
         int rcadd[6] = {};
         int rcadd2[6] = {};
+        updateChorusReverb(rcadd, rcadd2);
 
-        {
-            {
-                // 1
-                int v1 = pcm.ram2[30][4];
-                int m1 = multi(pcm.ram1[29][0], (v1 >> 8)) >> 6;
-                int v2 = 0;
-                int s1 = eram_unpack(pcm.ram2[28][1] + pcm.tv_counter, 1);
-                int s2 = eram_unpack(pcm.ram2[28][1] + pcm.tv_counter);
-                if ((v1 & 0x30) != 0)
-                {
-                    v2 = s1;
-                }
-                int v3 = addclip20(m1, v2 ^ 0xfffff, 1);
-                pcm.ram1[29][4] = v3;
-                int m2 = multi(v3, v1 & 255) >> 5;
-                pcm.ram1[29][5] = addclip20(m2 >> 1, s2, m2 & 1);
-            }
-            {
-                // 2
-                int v1 = pcm.ram2[30][4];
-                int v2 = 0;
-                int s1 = eram_unpack(pcm.ram2[28][2] + pcm.tv_counter, 1);
-                int s2 = eram_unpack(pcm.ram2[28][2] + pcm.tv_counter);
-                if ((v1 & 0x30) != 0)
-                {
-                    v2 = s1;
-                }
-                int v3 = addclip20(pcm.ram1[29][5], v2 ^ 0xfffff, 1);
-                pcm.ram1[29][5] = v3;
-                int m2 = multi(v3, v1 & 255) >> 5;
-                pcm.ram1[28][0] = addclip20(m2 >> 1, s2, m2 & 1);
-            }
-            {
-                // 3
-                int v1 = pcm.ram2[30][4];
-                int v2 = 0;
-                int s1 = eram_unpack(pcm.ram2[28][3] + pcm.tv_counter, 1);
-                int s2 = eram_unpack(pcm.ram2[28][3] + pcm.tv_counter);
-                if ((v1 & 0x30) != 0)
-                {
-                    v2 = s1;
-                }
-                int v3 = addclip20(pcm.ram1[28][0], v2 ^ 0xfffff, 1);
-                pcm.ram1[28][0] = v3;
-                int m2 = multi(v3, v1 & 255) >> 5;
-                pcm.ram1[28][1] = addclip20(m2 >> 1, s2, m2 & 1);
-
-
-                pcm.ram1[28][2] = eram_unpack(pcm.ram2[28][5] + pcm.tv_counter);
-            }
-            {
-                // 4
-                int v1 = pcm.ram2[30][5];
-                int v2 = 0;
-                int s1 = eram_unpack(pcm.ram2[28][4] + pcm.tv_counter, 1);
-                int s2 = eram_unpack(pcm.ram2[28][4] + pcm.tv_counter);
-                if ((v1 & 0x30) != 0)
-                {
-                    v2 = s1;
-                }
-                int v3 = addclip20(pcm.ram1[28][1], v2 ^ 0xfffff, 1);
-                pcm.ram1[28][1] = v3;
-                int m2 = multi(v3, v1 & 255) >> 5;
-                pcm.ram1[28][3] = addclip20(m2 >> 1, s2, m2 & 1);
-
-
-                pcm.ram1[28][4] = eram_unpack(pcm.ram2[29][1] + pcm.tv_counter);
-            }
-            {
-                // 5
-
-                int v1 = pcm.ram2[30][7];
-                int m1 = multi(pcm.ram1[29][2], (v1 >> 8)) >> 5;
-                int s1 = eram_unpack(pcm.ram2[29][0] + pcm.tv_counter);
-                int m2 = multi(s1, v1 & 255) >> 5;
-                pcm.ram1[29][2] = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1);
-
-                eram_pack(pcm.ram2[28][0] + pcm.tv_counter, pcm.ram1[29][4]);
-            }
-            {
-                // 6
-
-                int v1 = pcm.ram2[30][8];
-                int m1 = multi(pcm.ram1[29][3], (v1 >> 8)) >> 5;
-                int s1 = eram_unpack(pcm.ram2[29][8] + pcm.tv_counter);
-                int m2 = multi(s1, v1 & 255) >> 5;
-                pcm.ram1[29][3] = addclip20(m1 >> 1, m2 >> 1, (m1 | m2) & 1);
-
-                eram_pack(pcm.ram2[28][1] + pcm.tv_counter, pcm.ram1[29][5]);
-
-                eram_pack(pcm.ram2[28][2] + pcm.tv_counter, pcm.ram1[28][0]);
-            }
-            {
-                // 7
-
-                int v1 = pcm.ram2[30][9];
-                int v2 = pcm.ram1[28][3];
-                int m1 = multi(pcm.ram1[29][2], (v1 >> 8)) >> 5;
-                int m2 = multi(pcm.ram1[29][3], (v1 >> 8)) >> 5;
-                pcm.ram1[28][3] = addclip20(v2, m1 >> 1, m1 & 1);
-                pcm.ram1[28][5] = addclip20(v2, m2 >> 1, m2 & 1);
-
-                eram_pack(pcm.ram2[28][3] + pcm.tv_counter, pcm.ram1[28][1]);
-            }
-            {
-                // 8
-
-                int v1 = pcm.ram2[30][6];
-                int m1 = multi(pcm.ram1[28][2], v1 >> 8) >> 5;
-
-                int v2 = addclip20(pcm.ram1[28][3], m1 >> 1, m1 & 1);
-                pcm.ram1[28][3] = v2;
-                int m2 = multi(v2, v1 & 255) >> 5;
-                pcm.ram1[28][2] = addclip20(pcm.ram1[28][2], m2 >> 1, m2 & 1);
-
-
-                pcm.ram1[28][1] = eram_unpack(pcm.ram2[28][9] + pcm.tv_counter);
-            }
-            {
-                // 9
-
-                int v1 = pcm.ram2[30][6];
-                int m1 = multi(pcm.ram1[28][4], v1 >> 8) >> 5;
-
-                int v2 = addclip20(pcm.ram1[28][5], m1 >> 1, m1 & 1);
-                pcm.ram1[28][5] = v2;
-                int m2 = multi(v2, v1 & 255) >> 5;
-                pcm.ram1[28][4] = addclip20(pcm.ram1[28][4], m2 >> 1, m2 & 1);
-
-
-                pcm.ram1[29][4] = eram_unpack(pcm.ram2[29][5] + pcm.tv_counter);
-            }
-            {
-                // 10
-
-                int v1 = pcm.ram2[30][6];
-                int v2 = pcm.ram1[28][1];
-                int m1 = multi(v2, v1 >> 8) >> 5;
-                int s1 = eram_unpack(pcm.ram2[28][8] + pcm.tv_counter);
-                int v3 = addclip20(m1 >> 1, s1, m1 & 1);
-                pcm.ram1[28][1] = v3;
-                int m2 = multi(v3, v1 & 255) >> 5;
-                pcm.ram1[29][5] = addclip20(m2 >> 1, v2, m2 & 1);
-
-                eram_pack(pcm.ram2[28][4] + pcm.tv_counter, pcm.ram1[28][3]);
-            }
-            {
-                // 11
-
-                int v1 = pcm.ram2[30][6];
-                int v2 = pcm.ram1[29][4];
-                int m1 = multi(v2, v1 >> 8) >> 5;
-                int s1 = eram_unpack(pcm.ram2[29][4] + pcm.tv_counter);
-                int v3 = addclip20(m1 >> 1, s1, m1 & 1);
-                pcm.ram1[29][4] = v3;
-                int m2 = multi(v3, v1 & 255) >> 5;
-                pcm.ram1[28][0] = addclip20(m2 >> 1, v2, m2 & 1);
-
-
-                eram_pack(pcm.ram2[28][5] + pcm.tv_counter, pcm.ram1[28][2]);
-
-                eram_pack(pcm.ram2[29][0] + pcm.tv_counter, pcm.ram1[28][5]);
-            }
-            {
-                // 12
-
-                pcm.ram1[28][5] = eram_unpack(pcm.ram2[28][6] + pcm.tv_counter);
-            }
-
-            {
-                // 13
-
-                int s1 = eram_unpack(pcm.ram2[28][10] + pcm.tv_counter);
-                pcm.ram1[28][5] = addclip20(pcm.ram1[28][5], s1, 0);
-
-                pcm.ram1[28][2] = eram_unpack(pcm.ram2[29][2] + pcm.tv_counter);
-            }
-
-            {
-                // 14
-
-                int s1 = eram_unpack(pcm.ram2[29][6] + pcm.tv_counter);
-                int t1 = addclip20(s1, pcm.ram1[28][2], 0); // 6
-
-                pcm.ram1[28][5] = addclip20(t1, pcm.ram1[28][5], 0);
-
-                pcm.ram1[28][2] = eram_unpack(pcm.ram2[28][7] + pcm.tv_counter);
-            }
-
-            {
-                // 15
-
-                int s1 = eram_unpack(pcm.ram2[28][11] + pcm.tv_counter);
-                pcm.ram1[28][2] = addclip20(pcm.ram1[28][2], s1, 0);
-
-                pcm.ram1[28][3] = eram_unpack(pcm.ram2[29][3] + pcm.tv_counter);
-            }
-
-            {
-                // 16
-
-                int s1 = eram_unpack(pcm.ram2[29][7] + pcm.tv_counter);
-                int t1 = addclip20(s1, pcm.ram1[28][2], 0);
-                pcm.ram1[28][2] = addclip20(t1, pcm.ram1[28][3], 0);
-
-
-                eram_pack(pcm.ram2[29][1] + pcm.tv_counter, pcm.ram1[28][4]);
-
-                eram_pack(pcm.ram2[28][8] + pcm.tv_counter, pcm.ram1[28][1]);
-            }
-
-            {
-                // 17
-                int v1 = pcm.ram2[30][2];
-                int v2 = pcm.ram1[28][5];
-
-                int m1 = multi(v2, v1 >> 8) >> 5;
-
-                rcadd[0] = m1;
-
-                rcadd2[0] = multi(v2, v1 & 255) >> 5;
-
-                int t1 = eram_unpack(pcm.ram2[29][10] + pcm.tv_counter + 1); //? 3a6e
-                eram_pack(pcm.ram2[28][9] + pcm.tv_counter, pcm.ram1[29][5]);
-                pcm.ram1[29][5] = t1;
-            }
-
-            {
-                // 18
-                int v1 = pcm.ram2[30][3];
-                int v2 = pcm.ram1[28][2];
-
-                int m1 = multi(v2, v1 >> 8) >> 5;
-
-                rcadd[1] = m1;
-
-                rcadd2[1] = multi(v2, v1 & 255) >> 5;
-
-                pcm.ram1[28][1] = eram_unpack(pcm.ram2[29][11] + pcm.tv_counter + 1); //? 3a1e
-            }
-            {
-                // 19
-
-                int v1 = pcm.ram2[31][9];
-
-                int s1 = eram_unpack(pcm.ram2[29][10] + pcm.tv_counter); //? 3a6d
-
-                eram_pack(pcm.ram2[29][4] + pcm.tv_counter, pcm.ram1[29][4]);
-
-                int m1 = multi(s1, v1 >> 8) >> 5;
-                int m2 = multi(pcm.ram1[29][5], v1 >> 8) >> 5;
-
-                int t2 = addclip20(s1, (m1 >> 1) ^ 0xfffff, 1);
-
-                pcm.ram1[29][5] = addclip20(t2, m2 >> 1, m2 & 1);
-            }
-            {
-                // 20
-
-                int v1 = pcm.ram2[31][10];
-
-                int s1 = eram_unpack(pcm.ram2[29][11] + pcm.tv_counter); //? 3a1d
-
-                eram_pack(pcm.ram2[29][5] + pcm.tv_counter, pcm.ram1[28][0]);
-
-                int m1 = multi(s1, v1 >> 8) >> 5;
-                int m2 = multi(pcm.ram1[28][1], v1 >> 8) >> 5;
-
-                int t2 = addclip20(s1, (m1 >> 1) ^ 0xfffff, 1);
-
-                pcm.ram1[28][1] = addclip20(t2, m2 >> 1, m2 & 1);
-
-                eram_pack(pcm.ram2[29][9] + pcm.tv_counter, pcm.ram1[29][1]);
-            }
-            {
-                // 21
-
-                int v1 = pcm.ram2[31][2];
-                int v2 = pcm.ram1[29][5];
-
-                int m1 = multi(v2, v1 >> 8) >> 5;
-                int m2 = multi(v2, v1 & 255) >> 5;
-
-                rcadd[2] = m1;
-                rcadd2[2] = m2;
-            }
-            {
-                // 22
-
-                int v1 = pcm.ram2[31][3];
-                int v2 = pcm.ram1[29][5];
-
-                int m1 = multi(v2, v1 >> 8) >> 5;
-                int m2 = multi(v2, v1 & 255) >> 5;
-
-                rcadd[3] = m1;
-                rcadd2[3] = m2;
-            }
-            {
-                // 23
-
-                int v1 = pcm.ram2[31][4];
-                int v2 = pcm.ram1[28][1];
-
-                int m1 = multi(v2, v1 >> 8) >> 5;
-                int m2 = multi(v2, v1 & 255) >> 5;
-
-                rcadd[4] = m1;
-                rcadd2[4] = m2;
-            }
-            {
-                // 31
-
-                int v1 = pcm.ram2[31][5];
-                int v2 = pcm.ram1[28][1];
-
-                int m1 = multi(v2, v1 >> 8) >> 5;
-                int m2 = multi(v2, v1 & 255) >> 5;
-
-                rcadd[5] = m1;
-                rcadd2[5] = m2;
-
-                {
-                    // address generator
-
-                    int key = 1;
-                    int okey = (pcm.ram2[31][7] & 0x20) != 0;
-                    int active = key && okey;
-                    int kon = key && !okey;
-
-                    int b15 = (pcm.ram2[31][8] & 0x8000) != 0; // 0
-                    int b6 = (pcm.ram2[31][7] & 0x40) != 0; // 1
-                    int b7 = (pcm.ram2[31][7] & 0x80) != 0; // 1
-                    int old_nibble = (pcm.ram2[31][7] >> 12) & 15; // 1
-
-                    int address = pcm.ram1[31][4]; // 0
-                    int address_end = pcm.ram1[31][0]; // 1 or 2
-                    int address_loop = pcm.ram1[31][2]; // 2 or 1
-
-                    int sub_phase = (pcm.ram2[31][8] & 0x3fff); // 1
-                    int interp_ratio = (sub_phase >> 7) & 127;
-                    sub_phase += pcm.ram2[pcm.ram2[31][7] & 31][0]; // 5
-                    int sub_phase_of = (sub_phase >> 14) & 7;
-                    if (pcm.nfs)
-                    {
-                        pcm.ram2[31][8] &= ~0x3fff;
-                        pcm.ram2[31][8] |= sub_phase & 0x3fff;
-                    }
-
-
-                    // address 0
-                    int address_cnt = address;
-
-                    int cmp1 = b15 ? address_loop : address_end;
-                    int cmp2 = address_cnt;
-                    int address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 9
-                    int next_b15 = b15;
-
-                    int next_address = address_cnt; // 11
-
-                    cmp1 = (!b6 && address_cmp) ? address_loop : address_cnt;
-                    cmp2 = address_cnt;
-                    int address_cnt2 = (kon || (!b6 && address_cmp)) ? cmp1 : cmp2;
-
-                    int address_add = (!address_cmp && b6 && !b15) || (!address_cmp && !b6);
-                    int address_sub = !address_cmp && b6 && b15;
-                    if (b7)
-                        address_cnt2 -= address_add - address_sub;
-                    else
-                        address_cnt2 += address_add - address_sub;
-                    address_cnt = address_cnt2 & 0xfffff; // 11
-                    b15 = b6 && (b15 ^ address_cmp); // 11
-
-                    cmp1 = b15 ? address_loop : address_end;
-                    cmp2 = address_cnt;
-                    address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 13
-
-                    if (sub_phase_of >= 1)
-                    {
-                        next_address = address_cnt; // 13
-                        next_b15 = b15;
-                    }
-
-                    if (active && pcm.nfs)
-                        pcm.ram1[31][4] = next_address;
-
-                    if (pcm.nfs)
-                    {
-                        pcm.ram2[31][8] &= ~0x8000;
-                        pcm.ram2[31][8] |= next_b15 << 15;
-                    }
-
-                    int t1 = address_loop; // 18
-                    int t2 = pcm.ram1[31][4] - t1; // 19
-                    int t3 = address_end - t2; // 20
-                    int t4 = pcm.ram1[31][4]; // 23
-
-                    pcm.ram2[29][10] = t3;
-                    pcm.ram2[29][11] = t4;
-                }
-            }
-        }
-
-        pcm.ram1[31][1] = 0;
-        pcm.ram1[31][3] = 0;
+        pcm.ram1VoiceChorusSum->sumL = 0;
+        pcm.ram1VoiceChorusSum->sumR = 0;
         pcm.rcsum[0] = 0;
         pcm.rcsum[1] = 0;
 
         for (int slot = 0; slot < reg_slots; slot++)
         {
-            uint32_t *ram1 = pcm.ram1[slot];
-            uint16_t *ram2 = pcm.ram2[slot];
-            int okey = (ram2[7] & 0x20) != 0;
-            int key = (voice_active >> slot) & 1;
-
-            int active = okey && key;
-            int kon = key && !okey;
-
-            // address generator
-
-            int b15 = (ram2[8] & 0x8000) != 0; // 0
-            int b6 = (ram2[7] & 0x40) != 0; // 1
-            int b7 = (ram2[7] & 0x80) != 0; // 1
-            int hiaddr = (ram2[7] >> 8) & 15; // 1
-            int old_nibble = (ram2[7] >> 12) & 15; // 1
-
-            int address = ram1[4]; // 0
-            int address_end = ram1[0]; // 1 or 2
-            int address_loop = ram1[2]; // 2 or 1
-
-            int cmp1 = b15 ? address_loop : address_end;
-            int cmp2 = address;
-            int nibble_cmp1 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 2
-            int irq_flag = 0;
-
-            // fixme:
-            if (kon)
-                irq_flag = ((cmp1 + address_loop) & 0x100000) != 0;
-            else
-                irq_flag = ((address + ((-address_loop) & 0xfffff)) & 0x100000) != 0;
-            irq_flag ^= b7;
-
-            int nibble_address = (!b6 && nibble_cmp1) ? address_loop : address; // 3
-            int address_b4 = (nibble_address & 0x10) != 0;
-            int wave_address = nibble_address >> 5;
-            int xor2 = (address_b4 ^ b7);
-            int check1 = xor2 && active;
-            int xor1 = (b15 ^ !nibble_cmp1);
-            int nibble_add = b6 ? check1 && xor1 : (!nibble_cmp1 && check1);
-            int nibble_subtract = b6 && !xor1 && active && !xor2;
-            wave_address += nibble_add - nibble_subtract;
-            wave_address &= 0xfffff;
-
-            int newnibble = PCM_ReadROM((hiaddr << 20) | wave_address);
-            int newnibble_sel = address_b4 ^ ((b6 || !nibble_cmp1) && okey);
-            if (newnibble_sel)
-                newnibble = (newnibble >> 4) & 15;
-            else
-                newnibble &= 15;
-
-            int sub_phase = (ram2[8] & 0x3fff); // 1
-            int interp_ratio = (sub_phase >> 7) & 127;
-            sub_phase += pcm.ram2[ram2[7] & 31][0]; // 5
-            int sub_phase_of = (sub_phase >> 14) & 7;
-            if (pcm.nfs)
-            {
-                ram2[8] &= ~0x3fff;
-                ram2[8] |= sub_phase & 0x3fff;
-            }
-
-
-            // address 0
-            int address_cnt = address;
-            int samp0 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 18
-
-            cmp1 = address;
-            cmp2 = address_cnt;
-            int nibble_cmp2 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 8
-            cmp1 = b15 ? address_loop : address_end;
-            cmp2 = address_cnt;
-            int address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 9
-
-            int next_address = address_cnt; // 11
-            int usenew = !nibble_cmp2;
-            int next_b15 = b15;
-
-            cmp1 = (!b6 && address_cmp) ? address_loop : address_cnt;
-            cmp2 = address_cnt;
-            int address_cnt2 = (kon || (!b6 && address_cmp)) ? cmp1 : cmp2;
-
-            int address_add = (!address_cmp && b6 && !b15) || (!address_cmp && !b6);
-            int address_sub = !address_cmp && b6 && b15;
-            if (b7)
-                address_cnt2 -= address_add - address_sub;
-            else
-                address_cnt2 += address_add - address_sub;
-            address_cnt = address_cnt2 & 0xfffff; // 11
-            b15 = b6 && (b15 ^ address_cmp); // 11
-
-            int samp1 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 20
-
-            cmp1 = address;
-            cmp2 = address_cnt;
-            int nibble_cmp3 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 12
-            cmp1 = b15 ? address_loop : address_end;
-            cmp2 = address_cnt;
-            address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 13
-
-            if (sub_phase_of >= 1)
-            {
-                next_address = address_cnt; // 13
-                usenew = !nibble_cmp3;
-                next_b15 = b15;
-            }
-
-            cmp1 = (!b6 && address_cmp) ? address_loop : address_cnt;
-            cmp2 = address_cnt;
-            address_cnt2 = (kon || (!b6 && address_cmp)) ? cmp1 : cmp2;
-
-            address_add = (!address_cmp && b6 && !b15) || (!address_cmp && !b6);
-            address_sub = !address_cmp && b6 && b15;
-            if (b7)
-                address_cnt2 -= address_add - address_sub;
-            else
-                address_cnt2 += address_add - address_sub;
-            address_cnt = address_cnt2 & 0xfffff; // 15
-            b15 = b6 && (b15 ^ address_cmp); // 15
-
-            int samp2 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 1
-
-            cmp1 = address;
-            cmp2 = address_cnt;
-            int nibble_cmp4 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 16
-            cmp1 = b15 ? address_loop : address_end;
-            cmp2 = address_cnt;
-            address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 17
-
-            if (sub_phase_of >= 2)
-            {
-                next_address = address_cnt; // 17
-                usenew = !nibble_cmp4;
-                next_b15 = b15;
-            }
-
-            cmp1 = (!b6 && address_cmp) ? address_loop : address_cnt;
-            cmp2 = address_cnt;
-            address_cnt2 = (kon || (!b6 && address_cmp)) ? cmp1 : cmp2;
-
-            address_add = (!address_cmp && b6 && !b15) || (!address_cmp && !b6);
-            address_sub = !address_cmp && b6 && b15;
-            if (b7)
-                address_cnt2 -= address_add - address_sub;
-            else
-                address_cnt2 += address_add - address_sub;
-            address_cnt = address_cnt2 & 0xfffff; // 19
-            b15 = b6 && (b15 ^ address_cmp); // 19
-
-            int samp3 = (int8_t)PCM_ReadROM((hiaddr << 20) | address_cnt); // 5
-
-            cmp1 = address;
-            cmp2 = address_cnt;
-            int nibble_cmp5 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 20
-            cmp1 = b15 ? address_loop : address_end;
-            cmp2 = address_cnt;
-            address_cmp = (cmp1 & 0xfffff) == (cmp2 & 0xfffff); // 21
-
-            if (sub_phase_of >= 3)
-            {
-                next_address = address_cnt; // 21
-                usenew = !nibble_cmp5;
-                next_b15 = b15;
-            }
-
-            cmp1 = (!b6 && address_cmp) ? address_loop : address_cnt;
-            cmp2 = address_cnt;
-            address_cnt2 = (kon || (!b6 && address_cmp)) ? cmp1 : cmp2;
-
-            address_add = (!address_cmp && b6 && !b15) || (!address_cmp && !b6);
-            address_sub = !address_cmp && b6 && b15;
-            if (b7)
-                address_cnt2 -= address_add - address_sub;
-            else
-                address_cnt2 += address_add - address_sub;
-            address_cnt = address_cnt2 & 0xfffff; // 23
-            // b15 = b6 && (b15 ^ address_cmp); // 23
-
-            cmp1 = address;
-            cmp2 = address_cnt;
-            int nibble_cmp6 = (cmp1 & 0xffff0) == (cmp2 & 0xffff0); // 24
-
-            if (sub_phase_of >= 4)
-            {
-                next_address = address_cnt; // 1
-                usenew = !nibble_cmp6;
-                // b15 is not updated?
-            }
-
-            if (active && pcm.nfs)
-                ram1[4] = next_address;
-
-            if (pcm.nfs)
-            {
-                ram2[8] &= ~0x8000;
-                ram2[8] |= next_b15 << 15;
-            }
-
-            // dpcm
-
-            // 18
-            int reference = ram1[5];
-
-            // 19
-            int preshift = samp0 << 10;
-            int select_nibble = nibble_cmp2 ? old_nibble : newnibble;
-            int shift = (10 - select_nibble) & 15;
-
-            int shifted = (preshift << 1) >> shift;
-
-            if (sub_phase_of >= 1)
-                reference = addclip20(reference, shifted >> 1, shifted & 1);
-
-            preshift = samp1 << 10;
-            select_nibble = nibble_cmp3 ? old_nibble : newnibble;
-            shift = (10 - select_nibble) & 15;
-
-            shifted = (preshift << 1) >> shift;
-
-            if (sub_phase_of >= 2)
-                reference = addclip20(reference, shifted >> 1, shifted & 1);
-
-            preshift = samp2 << 10;
-            select_nibble = nibble_cmp4 ? old_nibble : newnibble;
-            shift = (10 - select_nibble) & 15;
-
-            shifted = (preshift << 1) >> shift;
-
-            if (sub_phase_of >= 3)
-                reference = addclip20(reference, shifted >> 1, shifted & 1);
-
-            preshift = samp3 << 10;
-            select_nibble = nibble_cmp5 ? old_nibble : newnibble;
-            shift = (10 - select_nibble) & 15;
-
-            shifted = (preshift << 1) >> shift;
-
-            if (sub_phase_of >= 4)
-                reference = addclip20(reference, shifted >> 1, shifted & 1);
-
-            // interpolation
-
-            int test = ram1[5];
-
-            int step0 = multi(interp_lut[0][interp_ratio] << 6, samp0) >> 8;
-            select_nibble = nibble_cmp2 ? old_nibble : newnibble;
-            shift = (10 - select_nibble) & 15;
-            step0 =  (step0 << 1) >> shift;
-
-            test = addclip20(test, step0 >> 1, step0 & 1);
-
-
-            int step1 = multi(interp_lut[1][interp_ratio] << 6, samp1) >> 8;
-            select_nibble = nibble_cmp3 ? old_nibble : newnibble;
-            shift = (10 - select_nibble) & 15;
-            step1 = (step1 << 1) >> shift;
-
-            test = addclip20(test, step1 >> 1, step1 & 1);
-
-            int step2 = multi(interp_lut[2][interp_ratio] << 6, samp2) >> 8;
-            select_nibble = nibble_cmp4 ? old_nibble : newnibble;
-            shift = (10 - select_nibble) & 15;
-            step2 = (step2 << 1) >> shift;
-
-            int reg1 = ram1[1];
-            int reg3 = ram1[3];
-            int reg2_6 = (ram2[6] >> 8) & 127;
-
-            test = addclip20(test, step2 >> 1, step2 & 1);
-
-            int filter = ram2[11];
-            int v3;
-
-            if (mcu_mk1)
-            {
-                int mult1 = multi(reg1, filter >> 8); // 8
-                int mult2 = multi(reg1, (filter >> 1) & 127); // 9
-                int mult3 = multi(reg1, reg2_6); // 10
-
-                int v2 = addclip20(reg3, mult1 >> 6, (mult1 >> 5) & 1); // 9
-                int v1 = addclip20(v2, mult2 >> 13, (mult2 >> 12) & 1); // 10
-                int subvar = addclip20(v1, (mult3 >> 6), (mult3 >> 5) & 1); // 11
-
-                ram1[3] = v1;
-
-                v3 = addclip20(test, subvar ^ 0xfffff, 1); // 12
-
-                int mult4 = multi(v3, filter >> 8);
-                int mult5 = multi(v3, (filter >> 1) & 127);
-                int v4 = addclip20(reg1, mult4 >> 6, (mult4 >> 5) & 1); // 14
-                int v5 = addclip20(v4, mult5 >> 13, (mult5 >> 12) & 1); // 15
-
-                ram1[1] = v5;
-            }
-            else
-            {
-                // hack: use 32-bit math to avoid overflow
-                int mult1 = reg1 * (int8_t)(filter >> 8); // 8
-                int mult2 = reg1 * (int8_t)((filter >> 1) & 127); // 9
-                int mult3 = reg1 * (int8_t)reg2_6; // 10
-
-                int v2 = reg3 + (mult1 >> 6) + ((mult1 >> 5) & 1); // 9
-                int v1 = v2 + (mult2 >> 13) + ((mult2 >> 12) & 1); // 10
-                int subvar = v1 + (mult3 >> 6) + ((mult3 >> 5) & 1); // 11
-
-                ram1[3] = v1;
-
-                int tests = test;
-                tests <<= 12;
-                tests >>= 12;
-
-                v3 = tests - subvar; // 12
-
-                int mult4 = v3 * (int8_t)(filter >> 8);
-                int mult5 = v3 * (int8_t)((filter >> 1) & 127);
-                int v4 = reg1 + (mult4 >> 6) + ((mult4 >> 5) & 1); // 14
-                int v5 = v4 + (mult5 >> 13) + ((mult5 >> 12) & 1); // 15
-
-                ram1[1] = v5;
-            }
-
-
-            ram1[5] = reference;
-
-            if (active && (ram2[6] & 1) != 0 && (ram2[8] & 0x4000) == 0 && !pcm.irq_assert && irq_flag)
-            {
-                //printf("irq voice %i\n", slot);
-                if (pcm.nfs)
-                    ram2[8] |= 0x4000;
-                pcm.irq_assert = 1;
-                pcm.irq_channel = slot;
-                if (mcu_jv880)
-                    MCU_GA_SetGAInt(5, 1);
-                else
-                    MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 1);
-            }
-
-            int volmul1 = 0;
-            int volmul2 = 0;
-
-            calc_tv(0, ram2[3], &ram2[9], active, &volmul1);
-            calc_tv(1, ram2[4], &ram2[10], active, &volmul2);
-            calc_tv(2, ram2[5], &ram2[11], active, NULL);
-
-            // if (volmul1 && volmul2)
-            //     volmul1 += 0;
-
-            int sample = (ram2[6] & 2) == 0 ? ram1[3] : v3;
-            //sample = test;
-
-            int multiv1 = multi(sample, volmul1 >> 8);
-            int multiv2 = multi(sample, (volmul1 >> 1) & 127);
-
-            int sample2 = addclip20(multiv1 >> 6, multiv2 >> 13, ((multiv2 >> 12) | (multiv1 >> 5)) & 1);
-
-            int multiv3 = multi(sample2, volmul2 >> 8);
-            int multiv4 = multi(sample2, (volmul2 >> 1) & 127);
-
-            int sample3 = addclip20(multiv3 >> 6, multiv4 >> 13, ((multiv4 >> 12) | (multiv3 >> 5)) & 1);
-
-            int pan = active ? ram2[1] : 0;
-            int rc = active ? ram2[2] : 0;
-
-            int sampl = multi(sample3, (pan >> 8) & 255);
-            int sampr = multi(sample3, (pan >> 0) & 255);
-
-            int rc0 = multi(sample3, (rc >> 8) & 255) >> 5; // reverb
-            int rc1 = multi(sample3, (rc >> 0) & 255) >> 5; // chorus
-            
-            // mix reverb/chorus?
-            int slot2 = (slot == reg_slots - 1) ? 31 : slot + 1;
-            switch (slot2)
-            {
-                // 17, 18 - reverb
-
-                case 17:
-                    pcm.ram1[31][1] = addclip20(pcm.ram1[31][1], rcadd[0] >> 1, rcadd[0] & 1);
-                    break;
-                case 18:
-                    pcm.ram1[31][3] = addclip20(pcm.ram1[31][3], rcadd[1] >> 1, rcadd[1] & 1);
-                    break;
-                case 21:
-                    pcm.ram1[31][1] = addclip20(pcm.ram1[31][1], rcadd[2] >> 1, rcadd[2] & 1);
-                    break;
-                case 22:
-                    pcm.ram1[31][3] = addclip20(pcm.ram1[31][3], rcadd[3] >> 1, rcadd[3] & 1);
-                    break;
-                case 23:
-                    pcm.ram1[31][1] = addclip20(pcm.ram1[31][1], rcadd[4] >> 1, rcadd[4] & 1);
-                    break;
-                case 31:
-                    pcm.ram1[31][3] = addclip20(pcm.ram1[31][3], rcadd[5] >> 1, rcadd[5] & 1);
-                    break;
-            }
-
-            int suml = addclip20(pcm.ram1[31][1], sampl >> 6, (sampl >> 5) & 1);
-            int sumr = addclip20(pcm.ram1[31][3], sampr >> 6, (sampr >> 5) & 1);
-
-            switch (slot2)
-            {
-                case 17:
-                    pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[0] >> 1, rcadd2[0] & 1);
-                    break;
-                case 18:
-                    pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[1] >> 1, rcadd2[1] & 1);
-                    break;
-                case 21:
-                    pcm.rcsum[0] = addclip20(pcm.rcsum[0], rcadd2[2] >> 1, rcadd2[2] & 1);
-                    break;
-                case 22:
-                    pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[3] >> 1, rcadd2[3] & 1);
-                    break;
-                case 23:
-                    pcm.rcsum[0] = addclip20(pcm.rcsum[0], rcadd2[4] >> 1, rcadd2[4] & 1);
-                    break;
-                case 31:
-                    pcm.rcsum[1] = addclip20(pcm.rcsum[1], rcadd2[5] >> 1, rcadd2[5] & 1);
-                    break;
-            }
-
-            pcm.rcsum[0] = addclip20(pcm.rcsum[0], rc0 >> 1, rc0 & 1);
-            pcm.rcsum[1] = addclip20(pcm.rcsum[1], rc1 >> 1, rc1 & 1);
-
-            if (slot != reg_slots - 1)
-            {
-                pcm.ram1[31][1] = suml;
-                pcm.ram1[31][3] = sumr;
-            }
-            else
-            {
-                pcm.accum_l = suml;
-                pcm.accum_r = sumr;
-            }
-
-            if (key && pcm.nfs)
-            {
-                ram2[7] &= ~0xf020;
-                ram2[7] |= ((usenew || kon) ? newnibble : old_nibble) << 12;
-
-                // update key
-                ram2[7] |= key << 5;
-            }
-
-            if (!active)
-            {
-                if (pcm.nfs)
-                {
-                    ram1[1] = 0;
-                    ram1[3] = 0;
-                    ram1[5] = 0;
-                }
-
-                ram2[8] = 0;
-                ram2[9] = 0;
-                ram2[10] = 0;
-            }
+            updateSlot(slot, slot == reg_slots - 1, voice_active, rcadd, rcadd2);
         }
 
-        if (pcm.nfs)
+        if (pcm.not_first_sample)
         {
-            pcm.ram2[31][7] |= 0x20;
+            pcm.ram2[31].addrLoopFlags |= 0x20; // key
         }
 
-        pcm.nfs = 1;
+        pcm.not_first_sample = true;
 
         int cycles = (reg_slots + 1) * 25;
-
         pcm.cycles += mcu_jv880 ? (cycles * 25) / 29 : cycles;
     }
 }

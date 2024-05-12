@@ -33,6 +33,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <curses.h>
 #define SDL_MAIN_HANDLED
 #include "SDL.h"
 #include "mcu.h"
@@ -855,6 +856,11 @@ void MCU_Write(uint32_t address, uint8_t value)
                 }
             }
         }
+        else if (address >= 0x6196 && address < 0x619a)
+        {
+            // JV880?
+            // mystery_value[address - 0x6196] = value;
+        }
         else
         {
             printf("Unknown write %x %x\n", address, value);
@@ -1066,6 +1072,17 @@ int SDLCALL work_thread(void* data)
     return 0;
 }
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0') 
+
 static void MCU_Run()
 {
     bool working = true;
@@ -1080,6 +1097,58 @@ static void MCU_Run()
 
         LCD_Update();
         SDL_Delay(15);
+
+        move(0, 0);
+        printw("Voice Enable:  " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN ,
+               BYTE_TO_BINARY((pcm.voice_mask >> 0) & 0xff), BYTE_TO_BINARY((pcm.voice_mask >> 8) & 0xff),
+               BYTE_TO_BINARY((pcm.voice_mask >> 16) & 0xff), BYTE_TO_BINARY((pcm.voice_mask >> 24) & 0xff));
+        move(1, 0);
+        printw("Voice Enable P: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN ,
+               BYTE_TO_BINARY((pcm.voice_mask_pending >> 0) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_pending >> 8) & 0xff),
+               BYTE_TO_BINARY((pcm.voice_mask_pending >> 16) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_pending >> 24) & 0xff));
+        move(2, 0);
+        printw("Voice Enable U: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN ,
+               BYTE_TO_BINARY((pcm.voice_mask_updating >> 0) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_updating >> 8) & 0xff),
+               BYTE_TO_BINARY((pcm.voice_mask_updating >> 16) & 0xff), BYTE_TO_BINARY((pcm.voice_mask_updating >> 24) & 0xff));
+        move(3, 0);
+        printw("Cfg 3C: %x    Cfg 3D: %x    IRQ Ch: %x    IRQ As: %x", pcm.config_reg_3c, pcm.config_reg_3d, pcm.irq_channel, pcm.irq_assert);
+
+        move(5, 0);
+        printw("irq:%x tvf:%x reso:%04x subp_addr:%02x key:%x alt:%x bw:%x hiaddr:%x nibble:%x",
+            pcm.ram2[27].resonanceFlags & 1,
+            (pcm.ram2[27].resonanceFlags >> 1) & 1,
+            pcm.ram2[27].resonanceFlags >> 2,
+            pcm.ram2[27].addrLoopFlags & 0b11111,
+            (pcm.ram2[27].addrLoopFlags >> 5) & 0b1,
+            (pcm.ram2[27].addrLoopFlags >> 6) & 0b1,
+            (pcm.ram2[27].addrLoopFlags >> 7) & 0b1,
+            (pcm.ram2[27].addrLoopFlags >> 8) & 0b1111,
+            (pcm.ram2[27].addrLoopFlags >> 12) & 0b1111);
+        move(6, 0);
+        printw("sub_phase:%04x irq_disable:%x loop_state:%x",
+            pcm.ram2[27].subPhaseState & 0b0011111111111111,
+            (pcm.ram2[27].subPhaseState >> 14) & 0b1,
+            (pcm.ram2[27].subPhaseState >> 15) & 0b1
+        );
+        
+        for (size_t i = 20; i < 32; i++)
+        {
+            move(7 + i, 0);
+            printw("%08x %08x %08x %08x %08x %08x %08x %08x",
+                pcm.ram1[i].addressEnd, pcm.ram1[i].filterTempHPF, pcm.ram1[i].addressLoop, pcm.ram1[i].filterTempLPF,
+                pcm.ram1[i].address, pcm.ram1[i].tempReference);
+        }
+
+        for (size_t i = 20; i < 32; i++)
+        {
+            move(20 + i, 0);
+            printw("%04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x",
+                pcm.ram2[i].pitch, pcm.ram2[i].pan, pcm.ram2[i].revChorSend, pcm.ram2[i].volume1,
+                pcm.ram2[i].volume2, pcm.ram2[i].cutoff, pcm.ram2[i].resonanceFlags, pcm.ram2[i].addrLoopFlags,
+                pcm.ram2[i].subPhaseState, pcm.ram2[i].volume1TV, pcm.ram2[i].volume2TV, pcm.ram2[i].cutoffTV);
+        }
+        
+        refresh();
     }
 
     work_thread_run = false;
@@ -1354,6 +1423,8 @@ int main(int argc, char *argv[])
 {
     (void)argc;
     std::string basePath;
+
+    initscr();
 
     int port = 0;
     int audioDeviceIndex = -1;
@@ -1742,8 +1813,22 @@ int main(int argc, char *argv[])
     PCM_Reset();
 
     if (resetType != ResetType::NONE) MIDI_Reset(resetType);
+
+    FILE* f = fopen("nvram.bin", "rb");
+    if (f)
+    {
+        fread(nvram, 1, 0x8000, f);
+        fclose(f);
+    }
     
     MCU_Run();
+
+    f = fopen("nvram.bin", "wb");
+    if (f)
+    {
+        fwrite(nvram, 1, 0x8000, f);
+        fclose(f);
+    }
 
     MCU_CloseAudio();
     MIDI_Quit();

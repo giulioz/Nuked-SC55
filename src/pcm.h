@@ -34,9 +34,120 @@
 #pragma once
 #include <stdint.h>
 
+// config_reg_3c
+// 0: bit depth?
+// 1: bit depth?
+// 2: bit depth?
+// 3: bit depth?
+// 4: bit depth?
+// 5: bit depth?
+// 6: oversampling
+// 7: output on/off
+
+// config_reg_3d
+// 0: reg_slots
+// 1: reg_slots
+// 2: reg_slots
+// 3: reg_slots
+// 4: reg_slots
+// 5: ~WCS7/WA20
+// 6: 
+// 7: 
+
+struct Ram1VoiceInfo {
+    uint32_t addressEnd;
+    uint32_t filterTempHPF;
+    uint32_t addressLoop;
+    uint32_t filterTempLPF;
+    uint32_t address;
+    uint32_t tempReference;
+    
+    uint32_t v6; // unused
+    uint32_t v7; // unused
+};
+
+struct Ram1Summing {
+    uint32_t prevL;
+    uint32_t prevR;
+    uint32_t newL;
+    uint32_t osL;
+    uint32_t newR;
+    uint32_t osR;
+    
+    uint32_t v6; // unused
+    uint32_t v7; // unused
+};
+
+struct Ram1Chorus {
+    uint32_t addressEnd;
+    uint32_t sumL;
+    uint32_t addressLoop;
+    uint32_t sumR;
+    uint32_t address;
+    
+    uint32_t v5; // unused
+    uint32_t v6; // unused
+    uint32_t v7; // unused
+};
+
+struct Ram2VoiceInfo {
+    //
+    // Set by CPU
+
+    uint16_t pitch; // pitch coarse | pitch fine
+    uint16_t pan; // pan l | pan r
+    uint16_t revChorSend; // reverb send | chorus send
+    uint16_t volume1; // volume1 | volume1 speed
+    uint16_t volume2; // volume2 | volume2 speed
+    uint16_t cutoff; // cutoff | cutoff speed
+
+    uint16_t resonanceFlags;
+    // 0: irq enable
+    // 1: filter mode (0:lpf, 1:hpf)
+    // 8-15: resonance (inverse)
+
+    uint16_t addrLoopFlags; // bank? | "key"?
+    // 0: sub_phase addr (pitch)
+    // 1: sub_phase addr (pitch)
+    // 2: sub_phase addr (pitch)
+    // 3: sub_phase addr (pitch)
+    // 4: sub_phase addr (pitch)
+    // 5: key
+    // 6: b6 (ping-pong?)
+    // 7: b7 (backwards?)
+    // 8,9,10,11: hiaddr
+    // 12,13,14,15: nibble
+    
+    //
+    // Set by PCM
+
+    uint16_t subPhaseState;
+    // 0-13: sub_phase
+    // 14: irq disable
+    // 15: b15 some loop state
+
+    uint16_t volume1TV; // volume1 tv
+    uint16_t volume2TV; // volume2 tv
+    uint16_t cutoffTV; // cutoff tv
+
+    uint16_t v12; // unused
+    uint16_t v13; // unused
+    uint16_t v14; // unused
+    uint16_t v15; // unused
+};
+
 struct pcm_t {
-    uint32_t ram1[32][8];
-    uint16_t ram2[32][16];
+    Ram1VoiceInfo ram1[32];
+    Ram2VoiceInfo ram2[32];
+
+    Ram1Summing *ram1VoiceSumming = (Ram1Summing*)&ram1[30];
+    Ram2VoiceInfo *ram2VoiceSumming = &ram2[30];
+    Ram1Chorus *ram1VoiceChorusSum = (Ram1Chorus*)&ram1[31];
+    Ram2VoiceInfo *ram2VoiceChorusSum = &ram2[31];
+    
+    Ram1VoiceInfo *ram1Voice31 = &ram1[31];
+    Ram2VoiceInfo *ram2Voice31 = &ram2[31];
+
     uint32_t select_channel;
     uint32_t voice_mask;
     uint32_t voice_mask_pending;
@@ -50,7 +161,7 @@ struct pcm_t {
     uint32_t irq_channel;
     uint32_t irq_assert;
 
-    uint32_t nfs;
+    bool not_first_sample;
 
     uint32_t tv_counter;
 
