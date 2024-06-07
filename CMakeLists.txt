@@ -186,6 +186,14 @@ if(USE_RTMIDI)
     endif()
 endif()
 
+if(WIN32)
+    set(USE_ASIO TRUE)
+endif()
+
+if(USE_ASIO)
+    include(AsioSDK)
+endif()
+
 
 set(SC55_SRC
     src/mcu.cpp src/mcu.h # main() is here!
