@@ -6,20 +6,22 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 cmake_policy(SET CMP0135 NEW)
 endif()
 
-function(download_file url hash)
-
-FetchContent_Declare(download_${hash}
-URL ${url}
-URL_HASH SHA256=${hash}
+FetchContent_Declare(asio_sdk_download
+  URL https://www.steinberg.net/asiosdk
+  URL_HASH SHA256=bc425d9b98701af74b43639798566c48bc005af7328a2251cff722c1885076b2
 )
 
-if(NOT download_${hash}_POPULATED)
-  FetchContent_Populate(download_${hash})
-endif()
+FetchContent_MakeAvailable(asio_sdk_download)
 
-endfunction(download_file)
+add_library(
+  AsioSDK STATIC EXCLUDE_FROM_ALL
+  ${asio_sdk_download_SOURCE_DIR}/host/asiodrivers.cpp
+  ${asio_sdk_download_SOURCE_DIR}/host/pc/asiolist.cpp
+)
 
-download_file(
-  https://www.steinberg.net/asiosdk
-  bc425d9b98701af74b43639798566c48bc005af7328a2251cff722c1885076b2
+target_include_directories(
+  AsioSDK PUBLIC
+  ${asio_sdk_download_SOURCE_DIR}/common
+  ${asio_sdk_download_SOURCE_DIR}/host
+  ${asio_sdk_download_SOURCE_DIR}/host/pc
 )

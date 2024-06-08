@@ -239,6 +239,10 @@ if(USE_RTMIDI)
     endif()
 endif()
 
+if(USE_ASIO)
+    target_link_libraries(nuked-sc55 PRIVATE AsioSDK)
+endif()
+
 if(WIN32)
     target_link_libraries(nuked-sc55 PRIVATE shlwapi winmm)
 endif()

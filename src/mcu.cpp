@@ -1194,7 +1194,7 @@ static const char* audio_format_to_str(int format)
     return "UNK";
 }
 
-int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum)
+int MCU_OpenAudio_SDL(int deviceIndex, int pageSize, int pageNum)
 {
     SDL_AudioSpec spec = {};
     SDL_AudioSpec spec_actual = {};
@@ -1258,9 +1258,35 @@ int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum)
     return 1;
 }
 
-void MCU_CloseAudio(void)
+int MCU_OpenAudio_ASIO(int deviceIndex, int pageSize, int pageNum)
 {
-    SDL_CloseAudio();
+    AsioDrivers asioDrivers;
+    if (loadAsioDriver(ASIO_DRIVER_NAME))
+    {
+        printf("No audio output device found.\n");
+        return 0;
+    }
+}
+
+int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum, bool useAsio)
+{
+    if (useAsio)
+    {
+        return MCU_OpenAudio_ASIO(deviceIndex, pageSize, pageNum);
+    }
+    else
+    {
+        return MCU_OpenAudio_SDL(deviceIndex, pageSize, pageNum);
+    }
+}
+
+void MCU_CloseAudio(bool useAsio)
+{
+    if (useAsio)
+        ;
+    else
+        SDL_CloseAudio();
+    
     if (sample_buffer) free(sample_buffer);
 }
 
@@ -1359,6 +1385,7 @@ int main(int argc, char *argv[])
     int audioDeviceIndex = -1;
     int pageSize = 512;
     int pageNum = 32;
+    bool useAsio = false;
     bool autodetect = true;
     ResetType resetType = ResetType::NONE;
 
@@ -1395,6 +1422,10 @@ int main(int argc, char *argv[])
                     pageSize = 512;
                     pageNum = 32;
                 }
+            }
+            else if (!strcmp(argv[i], "-asio"))
+            {
+                useAsio = true;
             }
             else if (!strcmp(argv[i], "-mk2"))
             {
@@ -1449,6 +1480,7 @@ int main(int argc, char *argv[])
                 printf("  -p:<port_number>               Set MIDI port.\n");
                 printf("  -a:<device_number>             Set Audio Device index.\n");
                 printf("  -ab:<page_size>:[page_count]   Set Audio Buffer size.\n");
+                printf("  -asio                          Use ASIO driver for audio out (Windows-only).\n");
                 printf("\n");
                 printf("  -mk2                           Use SC-55mk2 ROM set.\n");
                 printf("  -st                            Use SC-55st ROM set.\n");
@@ -1721,7 +1753,7 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-    if (!MCU_OpenAudio(audioDeviceIndex, pageSize, pageNum))
+    if (!MCU_OpenAudio(audioDeviceIndex, pageSize, pageNum, useAsio))
     {
         fprintf(stderr, "FATAL ERROR: Failed to open the audio stream.\n");
         fflush(stderr);
@@ -1745,7 +1777,7 @@ int main(int argc, char *argv[])
     
     MCU_Run();
 
-    MCU_CloseAudio();
+    MCU_CloseAudio(useAsio);
     MIDI_Quit();
     LCD_UnInit();
     SDL_Quit();
