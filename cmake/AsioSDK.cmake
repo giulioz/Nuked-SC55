@@ -15,13 +15,16 @@ FetchContent_MakeAvailable(asio_sdk_download)
 
 add_library(
   AsioSDK STATIC EXCLUDE_FROM_ALL
+  ${asio_sdk_download_SOURCE_DIR}/common/asio.cpp
   ${asio_sdk_download_SOURCE_DIR}/host/asiodrivers.cpp
   ${asio_sdk_download_SOURCE_DIR}/host/pc/asiolist.cpp
 )
 
-target_include_directories(
-  AsioSDK PUBLIC
+set(
+  ASIOSDK_INCLUDE_DIRS
   ${asio_sdk_download_SOURCE_DIR}/common
   ${asio_sdk_download_SOURCE_DIR}/host
   ${asio_sdk_download_SOURCE_DIR}/host/pc
 )
+
+target_include_directories(AsioSDK PUBLIC ${ASIOSDK_INCLUDE_DIRS})

@@ -46,6 +46,12 @@
 #include "utf8main.h"
 #include "utils/files.h"
 
+#if WIN32
+#define IEEE754_64FLOAT 1
+#include <asio.h>
+#include <asiodrivers.h>
+#endif
+
 #if __linux__
 #include <unistd.h>
 #include <limits.h>
@@ -1258,14 +1264,113 @@ int MCU_OpenAudio_SDL(int deviceIndex, int pageSize, int pageNum)
     return 1;
 }
 
+ASIOTime* bufferSwitchTimeInfo(ASIOTime* timeInfo, long index, ASIOBool processNow)
+{
+    printf("bufferSwitchTimeInfo\n");
+
+    return 0L;
+}
+
+void bufferSwitch(long index, ASIOBool processNow)
+{
+    printf("bufferSwitch\n");
+}
+
+void sampleRateChanged(ASIOSampleRate sRate)
+{
+    printf("Error! Sample rate changed!\n");
+}
+
+long asioMessages(long selector, long value, void* message, double* opt)
+{
+    return 0;
+}
+
 int MCU_OpenAudio_ASIO(int deviceIndex, int pageSize, int pageNum)
 {
     AsioDrivers asioDrivers;
-    if (loadAsioDriver(ASIO_DRIVER_NAME))
+    char* names[16] = { 0 };
+    for (size_t i = 0; i < 16; i++)
+        names[i] = (char*)calloc(32, 1);
+    long foundDrivers = asioDrivers.getDriverNames(names, 16);
+    if (foundDrivers == 0 || deviceIndex >= foundDrivers)
     {
-        printf("No audio output device found.\n");
+        printf("No ASIO audio driver found.\n");
         return 0;
     }
+
+    char* mainDriverName = deviceIndex == -1 ? names[0] : names[deviceIndex];
+    printf("Loading ASIO driver: %s\n", mainDriverName);
+
+    if (!asioDrivers.loadDriver(mainDriverName))
+    {
+        printf("Unable to load ASIO driver.\n");
+        return 0;
+    }
+
+    ASIODriverInfo driverInfo;
+    if (ASIOInit(&driverInfo) != ASE_OK)
+    {
+        printf("Unable to init ASIO driver.\n");
+        printf("asioVersion:   %d\n"
+               "driverVersion: %d\n"
+               "Name:          %s\n"
+               "ErrorMessage:  %s\n",
+               driverInfo.asioVersion, driverInfo.driverVersion,
+               driverInfo.name, driverInfo.errorMessage);
+        return 0;
+    }
+
+    for (size_t i = 0; i < 16; i++)
+        free(names[i]);
+
+    long inputChannels, outputChannels, minSize, maxSize, preferredSize, granularity;
+    ASIOGetChannels(&inputChannels, &outputChannels);
+    ASIOGetBufferSize(&minSize, &maxSize, &preferredSize, &granularity);
+    printf("ASIO butput channels: %d\n", outputChannels);
+    printf("ASIO buffer size info: %d(min), %d(max), %d(pref)\n", minSize, maxSize, preferredSize);
+    if (ASIOSetSampleRate((mcu_mk1 || mcu_jv880) ? 64000.0 : 66207.0) != ASE_OK)
+    {
+        printf("Cannot set ASIO to desired sample rate.\n");
+        return 0;
+    }
+
+    audio_page_size = (pageSize / 2) * 2; // must be even
+    audio_buffer_size = audio_page_size * pageNum;
+    sample_buffer = (short*)calloc(audio_buffer_size, sizeof(short));
+    if (!sample_buffer)
+    {
+        printf("Cannot allocate audio buffer.\n");
+        return 0;
+    }
+    sample_read_ptr = 0;
+    sample_write_ptr = 0;
+
+    ASIOCallbacks asioCallbacks = { 0 };
+    asioCallbacks.bufferSwitch = &bufferSwitch;
+    asioCallbacks.sampleRateDidChange = &sampleRateChanged;
+    asioCallbacks.asioMessage = &asioMessages;
+    asioCallbacks.bufferSwitchTimeInfo = &bufferSwitchTimeInfo;
+    ASIOBufferInfo bufferInfos[2];
+    bufferInfos[0].isInput = ASIOFalse;
+    bufferInfos[0].channelNum = 0;
+    bufferInfos[0].buffers[0] = bufferInfos[0].buffers[1] = 0;
+    bufferInfos[1].isInput = ASIOFalse;
+    bufferInfos[1].channelNum = 1;
+    bufferInfos[1].buffers[0] = bufferInfos[1].buffers[1] = 0;
+    if (ASIOCreateBuffers(bufferInfos, 2, audio_buffer_size, &asioCallbacks) != ASE_OK)
+    {
+        printf("Cannot create ASIO output buffers.\n");
+        return 0;
+    }
+
+    if (ASIOStart() != ASE_OK)
+    {
+        printf("Cannot start ASIO process.\n");
+        return 0;
+    }
+
+    return 1;
 }
 
 int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum, bool useAsio)
@@ -1283,9 +1388,15 @@ int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum, bool useAsio)
 void MCU_CloseAudio(bool useAsio)
 {
     if (useAsio)
-        ;
+    {
+        ASIOStop();
+        ASIODisposeBuffers();
+        ASIOExit();
+    }
     else
+    {
         SDL_CloseAudio();
+    }
     
     if (sample_buffer) free(sample_buffer);
 }

@@ -241,6 +241,7 @@ endif()
 
 if(USE_ASIO)
     target_link_libraries(nuked-sc55 PRIVATE AsioSDK)
+    target_include_directories(nuked-sc55 PRIVATE ${ASIOSDK_INCLUDE_DIRS})
 endif()
 
 if(WIN32)
