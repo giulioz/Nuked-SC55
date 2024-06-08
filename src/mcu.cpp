@@ -50,6 +50,12 @@
 #define IEEE754_64FLOAT 1
 #include <asio.h>
 #include <asiodrivers.h>
+
+AsioDrivers asioDrivers;
+ASIODriverInfo driverInfo;
+ASIOCallbacks asioCallbacks;
+ASIOBufferInfo bufferInfos[2];
+ASIOChannelInfo channelInfos[2];
 #endif
 
 #if __linux__
@@ -1077,7 +1083,7 @@ static void MCU_Run()
     bool working = true;
 
     work_thread_run = true;
-    SDL_Thread *thread = SDL_CreateThread(work_thread, "work thread", 0);
+    //SDL_Thread *thread = SDL_CreateThread(work_thread, "work thread", 0);
 
     while (working)
     {
@@ -1085,11 +1091,11 @@ static void MCU_Run()
             working = false;
 
         LCD_Update();
-        SDL_Delay(15);
+        Sleep(15);
     }
 
     work_thread_run = false;
-    SDL_WaitThread(thread, 0);
+    //SDL_WaitThread(thread, 0);
 }
 
 void MCU_PatchROM(void)
@@ -1264,13 +1270,6 @@ int MCU_OpenAudio_SDL(int deviceIndex, int pageSize, int pageNum)
     return 1;
 }
 
-ASIOTime* bufferSwitchTimeInfo(ASIOTime* timeInfo, long index, ASIOBool processNow)
-{
-    printf("bufferSwitchTimeInfo\n");
-
-    return 0L;
-}
-
 void bufferSwitch(long index, ASIOBool processNow)
 {
     printf("bufferSwitch\n");
@@ -1288,7 +1287,6 @@ long asioMessages(long selector, long value, void* message, double* opt)
 
 int MCU_OpenAudio_ASIO(int deviceIndex, int pageSize, int pageNum)
 {
-    AsioDrivers asioDrivers;
     char* names[16] = { 0 };
     for (size_t i = 0; i < 16; i++)
         names[i] = (char*)calloc(32, 1);
@@ -1308,7 +1306,6 @@ int MCU_OpenAudio_ASIO(int deviceIndex, int pageSize, int pageNum)
         return 0;
     }
 
-    ASIODriverInfo driverInfo;
     if (ASIOInit(&driverInfo) != ASE_OK)
     {
         printf("Unable to init ASIO driver.\n");
@@ -1329,13 +1326,21 @@ int MCU_OpenAudio_ASIO(int deviceIndex, int pageSize, int pageNum)
     ASIOGetBufferSize(&minSize, &maxSize, &preferredSize, &granularity);
     printf("ASIO butput channels: %d\n", outputChannels);
     printf("ASIO buffer size info: %d(min), %d(max), %d(pref)\n", minSize, maxSize, preferredSize);
-    if (ASIOSetSampleRate((mcu_mk1 || mcu_jv880) ? 64000.0 : 66207.0) != ASE_OK)
+    //if (ASIOSetSampleRate((mcu_mk1 || mcu_jv880) ? 64000.0 : 66207.0) != ASE_OK)
+    if (ASIOSetSampleRate(44100.0) != ASE_OK)
     {
         printf("Cannot set ASIO to desired sample rate.\n");
         return 0;
     }
 
     audio_page_size = (pageSize / 2) * 2; // must be even
+    int audio_page_size_samples = audio_page_size / 4;
+    if (audio_page_size_samples > maxSize)
+    {
+        printf("Audio page size too big, using the max supported instead.\n");
+        audio_page_size = maxSize * 4;
+    }
+
     audio_buffer_size = audio_page_size * pageNum;
     sample_buffer = (short*)calloc(audio_buffer_size, sizeof(short));
     if (!sample_buffer)
@@ -1346,22 +1351,29 @@ int MCU_OpenAudio_ASIO(int deviceIndex, int pageSize, int pageNum)
     sample_read_ptr = 0;
     sample_write_ptr = 0;
 
-    ASIOCallbacks asioCallbacks = { 0 };
     asioCallbacks.bufferSwitch = &bufferSwitch;
     asioCallbacks.sampleRateDidChange = &sampleRateChanged;
     asioCallbacks.asioMessage = &asioMessages;
-    asioCallbacks.bufferSwitchTimeInfo = &bufferSwitchTimeInfo;
-    ASIOBufferInfo bufferInfos[2];
-    bufferInfos[0].isInput = ASIOFalse;
-    bufferInfos[0].channelNum = 0;
-    bufferInfos[0].buffers[0] = bufferInfos[0].buffers[1] = 0;
-    bufferInfos[1].isInput = ASIOFalse;
-    bufferInfos[1].channelNum = 1;
-    bufferInfos[1].buffers[0] = bufferInfos[1].buffers[1] = 0;
-    if (ASIOCreateBuffers(bufferInfos, 2, audio_buffer_size, &asioCallbacks) != ASE_OK)
+
+    for (size_t i = 0; i < 2; i++)
+    {
+        bufferInfos[i].isInput = ASIOFalse;
+        bufferInfos[i].channelNum = i;
+        bufferInfos[i].buffers[0] = bufferInfos[i].buffers[1] = 0;
+    }
+
+    if (ASIOCreateBuffers(bufferInfos, 2, audio_page_size, &asioCallbacks) != ASE_OK)
     {
         printf("Cannot create ASIO output buffers.\n");
         return 0;
+    }
+
+    for (size_t i = 0; i < 2; i++)
+    {
+        channelInfos[i].channel = bufferInfos[i].channelNum;
+        channelInfos[i].isInput = bufferInfos[i].isInput;
+        if (ASIOGetChannelInfo(&channelInfos[i]) != ASE_OK)
+            break;
     }
 
     if (ASIOStart() != ASE_OK)
@@ -1391,7 +1403,7 @@ void MCU_CloseAudio(bool useAsio)
     {
         ASIOStop();
         ASIODisposeBuffers();
-        ASIOExit();
+        asioDrivers.removeCurrentDriver();
     }
     else
     {
