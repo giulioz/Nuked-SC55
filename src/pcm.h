@@ -124,7 +124,7 @@ struct Ram2VoiceInfo {
     uint16_t subPhaseState;
     // 0-13: sub_phase
     // 14: irq disable
-    // 15: b15 some loop state
+    // 15: alt loop state
 
     uint16_t volume1TV; // volume1 tv
     uint16_t volume2TV; // volume2 tv
