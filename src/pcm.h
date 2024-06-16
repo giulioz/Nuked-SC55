@@ -74,6 +74,7 @@ struct Pcm {
     uint8_t waverom2[0x200000];
     uint8_t waverom3[0x100000];
     uint8_t waverom_exp[0x800000];
+    uint8_t waverom_card[0x200000];
 
     void PCM_Write(uint32_t address, uint8_t data);
     uint8_t PCM_Read(uint32_t address);
