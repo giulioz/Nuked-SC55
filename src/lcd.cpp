@@ -327,7 +327,7 @@ uint32_t* LCD::LCD_Update(void)
             {
                 for (size_t i = 0; i < lcd_height; i++) {
                     for (size_t j = 0; j < lcd_width; j++) {
-                        lcd_buffer[i][j] = 0xFF0F6FFF;
+                        lcd_buffer[i][j] = 0xFF03be51;
                     }
                 }
             }

@@ -264,7 +264,7 @@ const uint32_t uart_buffer_size = 8192;
 static const int audio_buffer_size = 4096 * 8;
 static const int audio_page_size = 512;
 
-const size_t rf_num = 5;
+const size_t rf_num = 6;
 
 struct MCU {
     int romset = 0;

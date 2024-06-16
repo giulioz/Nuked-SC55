@@ -58,37 +58,44 @@ const char* rs_name[ROM_SET_COUNT] = {
     "JV880"
 };
 
-const char* roms[ROM_SET_COUNT][5] =
+static const int ROM_SET_N_FILES = 6;
+
+const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
 {
     "rom1.bin",
     "rom2.bin",
     "waverom1.bin",
     "waverom2.bin",
     "rom_sm.bin",
+    "",
 
     "rom1.bin",
     "rom2_st.bin",
     "waverom1.bin",
     "waverom2.bin",
     "rom_sm.bin",
+    "",
 
     "sc55_rom1.bin",
     "sc55_rom2.bin",
     "sc55_waverom1.bin",
     "sc55_waverom2.bin",
     "sc55_waverom3.bin",
+    "",
 
     "cm300_rom1.bin",
     "cm300_rom2.bin",
     "cm300_waverom1.bin",
     "cm300_waverom2.bin",
     "cm300_waverom3.bin",
+    "",
 
     "jv880_rom1.bin",
     "jv880_rom2.bin",
     "jv880_waverom1.bin",
     "jv880_waverom2.bin",
     "jv880_waverom_expansion.bin",
+    "jv880_waverom_pcmcard.bin",
 };
 
 int romset = ROM_SET_MK2;
@@ -893,6 +900,10 @@ void MCU::MCU_Write(uint32_t address, uint8_t value)
                 }
             }
         }
+        else if (mcu_jv880 && address >= 0x6196 && address <= 0x6199)
+        {
+            // nop: the jv880 rom writes into the rom at 002E77-002E7D
+        }
         else
         {
             // printf("Unknown write %x %x\n", address, value);
@@ -1182,25 +1193,28 @@ int MCU::startSC55(std::string *basePath)
             rom2_mask /= 2; // rom is half the size
             lcd.lcd_width = 820;
             lcd.lcd_height = 100;
+            lcd.lcd_col1 = 0x000000;
+            lcd.lcd_col2 = 0x78b500;
             break;
     }
 
-    std::string rpaths[5] =
+    std::string rpaths[ROM_SET_N_FILES] =
     {
         *basePath + "/" + roms[romset][0],
         *basePath + "/" + roms[romset][1],
         *basePath + "/" + roms[romset][2],
         *basePath + "/" + roms[romset][3],
-        *basePath + "/" + roms[romset][4]
+        *basePath + "/" + roms[romset][4],
+        *basePath + "/" + roms[romset][5]
     };
 
     bool r_ok = true;
     std::string errors_list;
 
-    for(size_t i = 0; i < 5; ++i)
+    for(size_t i = 0; i < ROM_SET_N_FILES; ++i)
     {
         s_rf[i] = Files::utf8_fopen(rpaths[i].c_str(), "rb");
-        bool optional = mcu_jv880 && i == 4;
+        bool optional = mcu_jv880 && i >= 4;
         r_ok &= optional || (s_rf[i] != nullptr);
         if(!s_rf[i])
         {
@@ -1304,6 +1318,11 @@ int MCU::startSC55(std::string *basePath)
             unscramble(tempbuf, pcm.waverom_exp, 0x800000);
         else
             printf("WaveRom EXP not found, skipping it.\n");
+
+        if (s_rf[5] && fread(tempbuf, 1, 0x200000, s_rf[5]))
+            unscramble(tempbuf, pcm.waverom_card, 0x200000);
+        else
+            printf("WaveRom PCM not found, skipping it.\n");
     }
     else
     {

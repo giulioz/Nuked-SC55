@@ -120,7 +120,6 @@ struct EmulatorView: View {
         VStack {
             screen.image?
                 .resizable()
-                .interpolation(.none)
                 .frame(width: CGFloat(lcd_width)/2, height: CGFloat(lcd_height)/2, alignment: .center)
                 .aspectRatio(contentMode: .fit)
             
