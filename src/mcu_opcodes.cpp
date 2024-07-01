@@ -147,6 +147,7 @@ void MCU_Operand_Sleep(uint8_t operand)
 
 void MCU_Operand_NotImplemented(uint8_t operand)
 {
+    printf("Operand %x not implemented\n", operand);
     MCU_ErrorTrap();
 }
 
@@ -170,6 +171,7 @@ enum {
 
 void MCU_LDM(uint8_t operand)
 {
+    printf("pc %02x%04x sp %02x%04x LDM\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
     uint8_t rlist = MCU_ReadCodeAdvance();
     int32_t i;
     for (i = 0; i < 8; i++)
@@ -185,6 +187,7 @@ void MCU_LDM(uint8_t operand)
 
 void MCU_STM(uint8_t operand)
 {
+    printf("pc %02x%04x sp %02x%04x STM\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
     uint8_t rlist = MCU_ReadCodeAdvance();
     int32_t i;
     for (i = 7; i >= 0; i--)
@@ -204,12 +207,42 @@ void MCU_TRAPA(uint8_t operand)
     uint32_t opcode = MCU_ReadCodeAdvance();
     if ((opcode & 0xf0) == 0x10)
     {
+        printf("pc %02x%04x sp %02x%04x TRAPA\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7]);
         MCU_Interrupt_TRAPA(opcode & 0x0f);
     }
     else
     {
         MCU_ErrorTrap();
     }
+}
+
+void MCU_LINK(uint8_t operand)
+{
+    if (operand == 0x17)
+    {
+        int16_t data = (int8_t)MCU_ReadCodeAdvance();
+        printf("pc %02x%04x sp %02x%04x LINK %d\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7], data);
+        MCU_PushStack(mcu.r[6]);
+        mcu.r[6] = mcu.r[7];
+        mcu.r[7] += data;
+    }
+    else if (operand == 0x1f)
+    {
+        uint32_t dataH = MCU_ReadCodeAdvance();
+        uint32_t dataL = MCU_ReadCodeAdvance();
+        MCU_ErrorTrap(); // TODO
+    }
+    else
+    {
+        MCU_ErrorTrap();
+    }
+}
+
+void MCU_UNLK(uint8_t operand)
+{
+    printf("pc %02x%04x sp %02x%04x UNLK\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
+    mcu.r[7] = mcu.r[6];
+    mcu.r[6] = MCU_PopStack();
 }
 
 void MCU_Jump_PJSR(uint8_t operand)
@@ -220,6 +253,7 @@ void MCU_Jump_PJSR(uint8_t operand)
     uint16_t address;
     address = MCU_ReadCodeAdvance() << 8;
     address |= MCU_ReadCodeAdvance();
+    printf("pc %02x%04x sp %02x%04x PJSR %02x%04x\n", mcu.cp, mcu.pc - 3, mcu.tp, mcu.r[7], page, address);
     MCU_PushStack(mcu.pc);
     MCU_PushStack(mcu.cp);
     mcu.cp = page;
@@ -233,12 +267,14 @@ void MCU_Jump_JSR(uint8_t operand)
     uint16_t address;
     address = MCU_ReadCodeAdvance() << 8;
     address |= MCU_ReadCodeAdvance();
+    printf("pc %02x%04x sp %02x%04x JSR %02x%04x\n", mcu.cp, mcu.pc - 2, mcu.tp, mcu.r[7], 0x00, address);
     MCU_PushStack(mcu.pc);
     mcu.pc = address;
 }
 
 void MCU_Jump_RTE(uint8_t operand)
 {
+    printf("pc %02x%04x sp %02x%04x RTE\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
     mcu.sr = MCU_PopStack();
     mcu.cp = (uint8_t)MCU_PopStack();
     mcu.pc = MCU_PopStack();
@@ -327,16 +363,19 @@ void MCU_Jump_Bcc(uint8_t operand)
 
 void MCU_Jump_RTS(uint8_t operand)
 {
+    printf("pc %02x%04x sp %02x%04x RTS\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
     mcu.pc = MCU_PopStack();
 }
 
 void MCU_Jump_RTD(uint8_t operand)
 {
     int16_t imm = (int8_t)MCU_ReadCodeAdvance();
+    printf("pc %02x%04x sp %02x%04x RTD %d\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7], imm);
     mcu.pc = MCU_PopStack();
 
     if (operand == 0x14)
     {
+        printf("rtd SP %04x => %04x\n", mcu.r[7], mcu.r[7] + imm);
         mcu.r[7] += imm;
         if (mcu.r[7] & 1)
             MCU_ErrorTrap();
@@ -361,11 +400,13 @@ void MCU_Jump_JMP(uint8_t operand)
         uint8_t opcode_l = opcode & 0x07;
         if (opcode == 0x19)
         {
+            printf("pc %02x%04x sp %02x%04x PRTS\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7]);
             mcu.cp = (uint8_t)MCU_PopStack();
             mcu.pc = MCU_PopStack();
         }
         else if (opcode_h == 0x19)
         {
+            printf("pc %02x%04x sp %02x%04x JMP_19_\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7]);
             MCU_PushStack(mcu.pc);
             MCU_PushStack(mcu.cp);
             opcode_l &= ~1;
@@ -374,10 +415,12 @@ void MCU_Jump_JMP(uint8_t operand)
         }
         else if (opcode_h == 0x1a)
         {
+            printf("pc %02x%04x sp %02x%04x JMP_1a_\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7]);
             mcu.pc = mcu.r[opcode_l];
         }
         else if (opcode_h == 0x1b)
         {
+            printf("pc %02x%04x sp %02x%04x JMP_1b_\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7]);
             MCU_PushStack(mcu.pc);
             mcu.pc = mcu.r[opcode_l];
         }
@@ -470,11 +513,13 @@ void MCU_Jump_BSR(uint8_t operand)
     if (operand == 0x0e)
     {
         disp = (int8_t)MCU_ReadCodeAdvance();
+        printf("pc %02x%04x sp %02x%04x BSR_S %04x\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7], mcu.pc + disp);
     }
     else
     {
         disp = MCU_ReadCodeAdvance() << 8;
         disp |= MCU_ReadCodeAdvance();
+        printf("pc %02x%04x sp %02x%04x BSR_L %04x\n", mcu.cp, mcu.pc - 2, mcu.tp, mcu.r[7], mcu.pc + disp);
     }
     MCU_PushStack(mcu.pc);
     mcu.pc += disp;
@@ -686,7 +731,10 @@ void MCU_Operand_General(uint8_t operand)
     operand_data = data;
     operand_status = 0;
 
+    uint16_t prev_sp = mcu.r[7];
     MCU_Opcode_Table[opcode](opcode, opcode_reg);
+    if (operand_reg == 7)
+        printf("gen SP %04x => %04x\n", prev_sp, mcu.r[7]);
 }
 
 void MCU_SetStatusCommon(uint32_t val, uint32_t siz)
@@ -705,6 +753,7 @@ void MCU_SetStatusCommon(uint32_t val, uint32_t siz)
 
 void MCU_Opcode_Short_NotImplemented(uint8_t opcode)
 {
+    printf("Opcode short %x not implemented\n", opcode);
     MCU_ErrorTrap();
 }
 
@@ -712,6 +761,8 @@ void MCU_Opcode_Short_MOVE(uint8_t opcode)
 {
     uint32_t reg = opcode & 0x07;
     uint8_t data = MCU_ReadCodeAdvance();
+    if (reg == 7)
+        printf("gen SP %04x => %04x\n", mcu.r[7], data);
     mcu.r[reg] &= ~0xff;
     mcu.r[reg] |= data;
     MCU_SetStatusCommon(data, 0);
@@ -721,6 +772,8 @@ void MCU_Opcode_Short_MOVI(uint8_t opcode)
 {
     uint32_t reg = opcode & 0x07;
     uint16_t data;
+    if (reg == 7)
+        printf("gen SP %04x => %04x\n", mcu.r[7], data);
     data = MCU_ReadCodeAdvance() << 8;
     data |= MCU_ReadCodeAdvance();
     mcu.r[reg] = data;
@@ -836,6 +889,7 @@ void MCU_Opcode_Short_CMP(uint8_t opcode)
 
 void MCU_Opcode_NotImplemented(uint8_t opcode, uint8_t opcode_reg)
 {
+    printf("Opcode %x %x not implemented\n", opcode, opcode_reg);
     MCU_ErrorTrap();
 }
 
@@ -1498,7 +1552,7 @@ void (*MCU_Operand_Table[256])(uint8_t operand) = {
     MCU_Operand_General, // 0C
     MCU_Operand_General, // 0D
     MCU_Jump_BSR, // 0E
-    MCU_Operand_NotImplemented, // 0F
+    MCU_UNLK, // 0F
     MCU_Jump_JMP, // 10
     MCU_Jump_JMP, // 11
     MCU_STM, // 12
@@ -1506,7 +1560,7 @@ void (*MCU_Operand_Table[256])(uint8_t operand) = {
     MCU_Jump_RTD, // 14
     MCU_Operand_General, // 15
     MCU_Operand_NotImplemented, // 16
-    MCU_Operand_NotImplemented, // 17
+    MCU_LINK, // 17
     MCU_Jump_JSR, // 18
     MCU_Jump_RTS, // 19
     MCU_Operand_Sleep, // 1A
@@ -1514,7 +1568,7 @@ void (*MCU_Operand_Table[256])(uint8_t operand) = {
     MCU_Jump_RTD, // 1C
     MCU_Operand_General, // 1D
     MCU_Jump_BSR, // 1E
-    MCU_Operand_NotImplemented, // 1F
+    MCU_LINK, // 1F
     MCU_Jump_Bcc, // 20
     MCU_Jump_Bcc, // 21
     MCU_Jump_Bcc, // 22

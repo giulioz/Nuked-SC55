@@ -103,6 +103,9 @@ enum {
 };
 
 extern uint8_t dev_register[0x80];
+extern uint8_t dev_IRQCR;
+extern uint8_t dev_WDT_TCSR;
+extern uint8_t dev_WDT_TCNT;
 
 const uint16_t sr_mask = 0x870f;
 enum {
@@ -148,32 +151,35 @@ enum {
     VECTOR_TRAPA_E,
     VECTOR_TRAPA_F,
     VECTOR_IRQ0,
-    VECTOR_IRQ1,
+    VECTOR_WDT,
     VECTOR_INTERNAL_INTERRUPT_88, // UNUSED
     VECTOR_INTERNAL_INTERRUPT_8C, // UNUSED
-    VECTOR_INTERNAL_INTERRUPT_90, // FRT1 ICI
-    VECTOR_INTERNAL_INTERRUPT_94, // FRT1 OCIA
-    VECTOR_INTERNAL_INTERRUPT_98, // FRT1 OCIB
-    VECTOR_INTERNAL_INTERRUPT_9C, // FRT1 FOVI
-    VECTOR_INTERNAL_INTERRUPT_A0, // FRT2 ICI
-    VECTOR_INTERNAL_INTERRUPT_A4, // FRT2 OCIA
-    VECTOR_INTERNAL_INTERRUPT_A8, // FRT2 OCIB
-    VECTOR_INTERNAL_INTERRUPT_AC, // FRT2 FOVI
-    VECTOR_INTERNAL_INTERRUPT_B0, // FRT3 ICI
-    VECTOR_INTERNAL_INTERRUPT_B4, // FRT3 OCIA
-    VECTOR_INTERNAL_INTERRUPT_B8, // FRT3 OCIB
-    VECTOR_INTERNAL_INTERRUPT_BC, // FRT3 FOVI
+    VECTOR_IRQ1,
+    VECTOR_IRQ2,
+    VECTOR_IRQ3,
+    VECTOR_INTERNAL_INTERRUPT_9C, // UNUSED
+    VECTOR_INTERNAL_INTERRUPT_A0, // FRT1 ICI
+    VECTOR_INTERNAL_INTERRUPT_A4, // FRT1 OCIA
+    VECTOR_INTERNAL_INTERRUPT_A8, // FRT1 OCIB
+    VECTOR_INTERNAL_INTERRUPT_AC, // FRT1 FOVI
+    VECTOR_INTERNAL_INTERRUPT_B0, // FRT2 ICI
+    VECTOR_INTERNAL_INTERRUPT_B4, // FRT2 OCIA
+    VECTOR_INTERNAL_INTERRUPT_B8, // FRT2 OCIB
+    VECTOR_INTERNAL_INTERRUPT_BC, // FRT2 FOVI
     VECTOR_INTERNAL_INTERRUPT_C0, // CMIA
     VECTOR_INTERNAL_INTERRUPT_C4, // CMIB
     VECTOR_INTERNAL_INTERRUPT_C8, // OVI
     VECTOR_INTERNAL_INTERRUPT_CC, // UNUSED
-    VECTOR_INTERNAL_INTERRUPT_D0, // ERI
-    VECTOR_INTERNAL_INTERRUPT_D4, // RXI
-    VECTOR_INTERNAL_INTERRUPT_D8, // TXI
+    VECTOR_INTERNAL_INTERRUPT_D0, // SCI1 ERI
+    VECTOR_INTERNAL_INTERRUPT_D4, // SCI1 RXI
+    VECTOR_INTERNAL_INTERRUPT_D8, // SCI1 TXI
     VECTOR_INTERNAL_INTERRUPT_DC, // UNUSED
-    VECTOR_INTERNAL_INTERRUPT_E0, // ADI
+    VECTOR_INTERNAL_INTERRUPT_E0, // SCI2 ERI
+    VECTOR_INTERNAL_INTERRUPT_E4, // SCI2 RXI
+    VECTOR_INTERNAL_INTERRUPT_E8, // SCI2 TXI
+    VECTOR_INTERNAL_INTERRUPT_EC, // UNUSED
+    VECTOR_INTERNAL_INTERRUPT_F0, // ADI
 };
-
 
 struct mcu_t {
     uint16_t r[8];
@@ -356,18 +362,20 @@ inline void MCU_SetStatus(uint32_t condition, uint32_t mask)
 
 inline void MCU_PushStack(uint16_t data)
 {
+    printf("push SP %04x => %04x\n", mcu.r[7], mcu.r[7] - 2);
     if (mcu.r[7] & 1)
         MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
     mcu.r[7] -= 2;
-    MCU_Write16(mcu.r[7], data);
+    MCU_Write16(mcu.tp << 16 | mcu.r[7], data);
 }
 
 inline uint16_t MCU_PopStack(void)
 {
+    printf("pop SP %04x => %04x\n", mcu.r[7], mcu.r[7] + 2);
     uint16_t ret;
     if (mcu.r[7] & 1)
         MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
-    ret = MCU_Read16(mcu.r[7]);
+    ret = MCU_Read16(mcu.tp << 16 | mcu.r[7]);
     mcu.r[7] += 2;
     return ret;
 }
@@ -439,6 +447,7 @@ enum {
     ROM_SET_RLP3237,
     ROM_SET_SC155,
     ROM_SET_SC155MK2,
+    ROM_SET_RD500,
     ROM_SET_COUNT
 };
 
@@ -452,6 +461,7 @@ extern int mcu_st;
 extern int mcu_jv880;
 extern int mcu_scb55;
 extern int mcu_sc155;
+extern int mcu_rd500;
 
 extern SDL_atomic_t mcu_button_pressed;
 

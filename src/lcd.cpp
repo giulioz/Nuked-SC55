@@ -220,6 +220,11 @@ const int button_map_jv880[][2] =
     SDL_SCANCODE_G, MCU_BUTTON_ENTER,
 };
 
+const int button_map_rd500[][2] =
+{
+    // TODO
+};
+
 
 void LCD_SetBackPath(const std::string &path)
 {
@@ -545,8 +550,12 @@ void LCD_Update(void)
                 int mask = 0;
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
 
-                auto button_map = mcu_jv880 ? button_map_jv880 : button_map_sc55;
-                auto button_size = (mcu_jv880 ? sizeof(button_map_jv880) : sizeof(button_map_sc55)) / sizeof(button_map_sc55[0]);
+                auto button_map = mcu_rd500 ? button_map_rd500 : mcu_jv880 ? button_map_jv880 : button_map_sc55;
+                auto button_size = (
+                    mcu_rd500 ? sizeof(button_map_rd500) :
+                    mcu_jv880 ? sizeof(button_map_jv880) :
+                    sizeof(button_map_sc55)
+                ) / sizeof(button_map_sc55[0]);
                 for (size_t i = 0; i < button_size; i++)
                 {
                     if (button_map[i][0] == sdl_event.key.keysym.scancode)

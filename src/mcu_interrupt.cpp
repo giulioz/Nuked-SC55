@@ -37,6 +37,7 @@
 
 void MCU_Interrupt_Start(int32_t mask)
 {
+    printf("pc %02x%04x sp %02x%04x Interrupt Start\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
     MCU_PushStack(mcu.pc);
     MCU_PushStack(mcu.cp);
     MCU_PushStack(mcu.sr);
@@ -141,76 +142,97 @@ void MCU_Interrupt_Handle(void)
         switch (i)
         {
             case INTERRUPT_SOURCE_IRQ0:
-                if ((dev_register[DEV_P1CR] & 0x20) == 0)
-                    continue;
+                // if ((dev_IRQCR & 0b0001) == 0)
+                //     continue;
                 vector = VECTOR_IRQ0;
                 level = (dev_register[DEV_IPRA] >> 4) & 7;
+                // printf("IRQ VECTOR_IRQ0\n");
+                break;
+            case INTERRUPT_SOURCE_WDT:
+                vector = VECTOR_WDT;
+                level = (dev_register[DEV_IPRA] >> 4) & 7;
+                // printf("IRQ VECTOR_WDT\n");
                 break;
             case INTERRUPT_SOURCE_IRQ1:
-                if ((dev_register[DEV_P1CR] & 0x40) == 0)
-                    continue;
+                // if ((dev_IRQCR & 0b0010) == 0)
+                //     continue;
                 vector = VECTOR_IRQ1;
                 level = (dev_register[DEV_IPRA] >> 0) & 7;
+                // printf("IRQ VECTOR_IRQ1\n");
+                break;
+            case INTERRUPT_SOURCE_IRQ2:
+                // if ((dev_IRQCR & 0b0100) == 0)
+                //     continue;
+                vector = VECTOR_IRQ2;
+                level = (dev_register[DEV_IPRA] >> 0) & 7;
+                // printf("IRQ VECTOR_IRQ2\n");
+                break;
+            case INTERRUPT_SOURCE_IRQ3:
+                // if ((dev_IRQCR & 0b1000) == 0)
+                //     continue;
+                vector = VECTOR_IRQ3;
+                level = (dev_register[DEV_IPRA] >> 0) & 7;
+                // printf("IRQ VECTOR_IRQ3\n");
                 break;
             case INTERRUPT_SOURCE_FRT0_OCIA:
-                vector = VECTOR_INTERNAL_INTERRUPT_94;
+                vector = VECTOR_INTERNAL_INTERRUPT_A4;
                 level = (dev_register[DEV_IPRB] >> 4) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_FRT0_OCIA\n");
                 break;
             case INTERRUPT_SOURCE_FRT0_OCIB:
-                vector = VECTOR_INTERNAL_INTERRUPT_98;
+                vector = VECTOR_INTERNAL_INTERRUPT_A8;
                 level = (dev_register[DEV_IPRB] >> 4) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_FRT0_OCIB\n");
                 break;
             case INTERRUPT_SOURCE_FRT0_FOVI:
-                vector = VECTOR_INTERNAL_INTERRUPT_9C;
+                vector = VECTOR_INTERNAL_INTERRUPT_AC;
                 level = (dev_register[DEV_IPRB] >> 4) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_FRT0_FOVI\n");
                 break;
             case INTERRUPT_SOURCE_FRT1_OCIA:
-                vector = VECTOR_INTERNAL_INTERRUPT_A4;
+                vector = VECTOR_INTERNAL_INTERRUPT_B4;
                 level = (dev_register[DEV_IPRB] >> 0) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_FRT1_OCIA\n");
                 break;
             case INTERRUPT_SOURCE_FRT1_OCIB:
-                vector = VECTOR_INTERNAL_INTERRUPT_A8;
+                vector = VECTOR_INTERNAL_INTERRUPT_B8;
                 level = (dev_register[DEV_IPRB] >> 0) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_FRT1_OCIB\n");
                 break;
             case INTERRUPT_SOURCE_FRT1_FOVI:
-                vector = VECTOR_INTERNAL_INTERRUPT_AC;
-                level = (dev_register[DEV_IPRB] >> 0) & 7;
-                break;
-            case INTERRUPT_SOURCE_FRT2_OCIA:
-                vector = VECTOR_INTERNAL_INTERRUPT_B4;
-                level = (dev_register[DEV_IPRC] >> 4) & 7;
-                break;
-            case INTERRUPT_SOURCE_FRT2_OCIB:
-                vector = VECTOR_INTERNAL_INTERRUPT_B8;
-                level = (dev_register[DEV_IPRC] >> 4) & 7;
-                break;
-            case INTERRUPT_SOURCE_FRT2_FOVI:
                 vector = VECTOR_INTERNAL_INTERRUPT_BC;
-                level = (dev_register[DEV_IPRC] >> 4) & 7;
+                level = (dev_register[DEV_IPRB] >> 0) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_FRT1_FOVI\n");
                 break;
             case INTERRUPT_SOURCE_TIMER_CMIA:
                 vector = VECTOR_INTERNAL_INTERRUPT_C0;
-                level = (dev_register[DEV_IPRC] >> 0) & 7;
+                level = (dev_register[DEV_IPRC] >> 4) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_TIMER_CMIA\n");
                 break;
             case INTERRUPT_SOURCE_TIMER_CMIB:
                 vector = VECTOR_INTERNAL_INTERRUPT_C4;
-                level = (dev_register[DEV_IPRC] >> 0) & 7;
+                level = (dev_register[DEV_IPRC] >> 4) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_TIMER_CMIB\n");
                 break;
             case INTERRUPT_SOURCE_TIMER_OVI:
                 vector = VECTOR_INTERNAL_INTERRUPT_C8;
-                level = (dev_register[DEV_IPRC] >> 0) & 7;
-                break;
-            case INTERRUPT_SOURCE_ANALOG:
-                vector = VECTOR_INTERNAL_INTERRUPT_E0;
-                level = (dev_register[DEV_IPRD] >> 0) & 7;
+                level = (dev_register[DEV_IPRC] >> 4) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_TIMER_OVI\n");
                 break;
             case INTERRUPT_SOURCE_UART_RX:
                 vector = VECTOR_INTERNAL_INTERRUPT_D4;
-                level = (dev_register[DEV_IPRD] >> 4) & 7;
+                level = (dev_register[DEV_IPRC] >> 0) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_UART_RX\n");
                 break;
             case INTERRUPT_SOURCE_UART_TX:
                 vector = VECTOR_INTERNAL_INTERRUPT_D8;
-                level = (dev_register[DEV_IPRD] >> 4) & 7;
+                level = (dev_register[DEV_IPRC] >> 0) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_UART_TX\n");
+                break;
+            case INTERRUPT_SOURCE_ANALOG:
+                vector = VECTOR_INTERNAL_INTERRUPT_F0;
+                level = (dev_register[DEV_IPRD] >> 0) & 7;
+                // printf("IRQ INTERRUPT_SOURCE_ANALOG\n");
                 break;
             default:
                 break;
