@@ -730,6 +730,7 @@ uint8_t MCU_Read(uint32_t address)
             else if (address == 0xfe87) // P4DR, button scan read
             {
                 ret = 0x00;
+                ret = 0xFF;
             }
             else if (address == 0xfe8b) // P6DR, pedals
             {
@@ -1677,6 +1678,8 @@ int SDLCALL work_thread(void* data)
                 }
             }
         }
+
+        MIDI_Update();
     }
     MCU_WorkThread_Unlock();
 
@@ -1825,7 +1828,7 @@ int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum)
     audio_buffer_size = audio_page_size*pageNum;
     
     spec.format = AUDIO_S16SYS;
-    spec.freq = (mcu_mk1 || mcu_jv880) ? 64000 : 66207;
+    spec.freq = (mcu_mk1 || mcu_jv880 || mcu_rd500) ? 64000 : 66207;
     spec.channels = 2;
     spec.callback = audio_callback;
     spec.samples = audio_page_size / 4;
