@@ -243,6 +243,9 @@ static uint8_t io_sd = 0x00;
 static uint8_t led_7seg_out = 0x00;
 static uint8_t last_io_sd = 0;
 
+bool initial = true;
+// SDL_atomic_t mcu_button_pressed = { 1 << MCU_SC88_BUTTON_MIDI_CH_L | 1 << MCU_SC88_BUTTON_MIDI_CH_R };
+// SDL_atomic_t mcu_button_pressed = { 1 << MCU_SC88_BUTTON_KEY_SHIFT_L | 1 << MCU_SC88_BUTTON_KEY_SHIFT_R };
 SDL_atomic_t mcu_button_pressed = { 0 };
 
 uint8_t RCU_Read(void)
@@ -285,6 +288,12 @@ uint16_t MCU_AnalogReadPin(uint32_t pin)
         if (pin == 1)
             return ANALOG_LEVEL_BATTERY;
         return 0x3ff;
+    }
+    if (mcu_sc88)
+    {
+        if (pin == 0)
+            return ANALOG_LEVEL_BATTERY;
+        return ANALOG_LEVEL_SW_0;
     }
     if (0)
     {
@@ -796,6 +805,7 @@ uint8_t MCU_Read(uint32_t address)
             printf("%02x%04x: read  %02x%04x\n", mcu.cp, mcu.pc, page, address);
         return ret;
     }
+    
     else if (mcu_sc88)
     {
         uint8_t page = (address_full >> 16) & 0xff;
@@ -805,46 +815,42 @@ uint8_t MCU_Read(uint32_t address)
             else if (address == 0xfe87) ret = 0b00000000; // P4DR
             else if (address == 0xfe8a) ret = 0b00101101; // P5DR
             else if (address < 0x8000)
-            {
                 ret = rom2[address];
-            }
             else if (address >= 0xfe80 && address <= 0xff1f)
             {
                 // printf("%02x%04x: read dev %02x%04x\n", mcu.cp, mcu.pc, page, address);
                 ret = MCU_ReadDev_510(address);
             }
             else if (address >= 0x8000 && address <= 0xffff)
-            {
                 ret = sram[address & 0xffff];
-            }
             else
                 printf("%02x%04x: read-0 %02x%04x\n", mcu.cp, mcu.pc, page, address);
         }
         else if (page <= 0x7)
-        {
             ret = rom2[address_full & (0x80000-1)];
-        }
         else if (page == 0x8)
-        {
             ret = sram[address & 0xffff];
-        }
         else if (page == 0xe)
         {
             // XP
-            // printf("%x%04x: read-e %02x%04x\n", mcu.cp, mcu.pc, page, address);
-            ret = 0xff;
+            printf("%x%04x: read-e %02x%04x\n", mcu.cp, mcu.pc, page, address);
+            ret = 0x80;
         }
         else if (page == 0xf)
         {
-            // printf("%x%04x: read-f %02x%04x\n", mcu.cp, mcu.pc, page, address);
-            // ret = 0x00;
-            if (address == 0x00c0)
+            printf("%x%04x: read-f %02x%04x\n", mcu.cp, mcu.pc, page, address);
+            if (address == 0x00c0) // Version H
+                ret = 0x1;
+            else if (address == 0x00c1)  // Version L
+                ret = 0x23;
+            else if (address == 0x00dc)
+            {
                 ret = 0x00;
-            else if (address == 0x00c1)
-                ret = 0x00;
+                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ2, 0);
+            }
             else if (address == 0x00fd) // Read 0x80 on boot
                 ret = 0x80;
-            else if (address == 0x00fe) // P0/PB?
+            else if (address == 0x00fe) // Buttons
             {
                 uint8_t data = 0xff;
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
@@ -860,21 +866,11 @@ uint8_t MCU_Read(uint32_t address)
 
                 ret = data;
             }
-            else if (address == 0xc104)
+            else if (address == 0xc104) // IRQ
             {
-                ret = 0b1;
+                ret = ga_int_trigger;
+                ga_int_trigger = 0;
                 MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 0);
-            }
-            else if (address == 0xc105)
-            {
-                // printf("%x%04x: read-f %02x%04x\n", mcu.cp, mcu.pc, page, address);
-                // MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 0);
-            }
-            else if (address >= 0xc100)
-            {
-                // printf("%x%04x: read-f %02x%04x\n", mcu.cp, mcu.pc, page, address);
-                // MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 0);
-                ret = 0x00;
             }
             else
             {
@@ -886,6 +882,7 @@ uint8_t MCU_Read(uint32_t address)
             printf("%x%04x: read  %02x%04x\n", mcu.cp, mcu.pc, page, address);
         return ret;
     }
+    
     else if (mcu_xp10)
     {
         // if (address_full >= 0x680000) printf("%x 8-bit access\n", address_full);
@@ -962,6 +959,7 @@ uint8_t MCU_Read(uint32_t address)
             printf("%x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
         return ret;
     }
+    
     else if (mcu_ra30)
     {
         uint8_t page = (address_full >> 16) & 0xff;
@@ -1410,36 +1408,34 @@ void MCU_Write(uint32_t address, uint8_t value)
         uint8_t page = (address_full >> 16) & 0xff;
         if (page == 0)
         {
-            if (address >= 0xfe80 && address <= 0xff1f)
+            if (address == 0xfe87) // P4DR
+            {
+                // printf("Contrast %02x\n", value);
+            }
+            else if (address >= 0xfe80 && address <= 0xff1f)
             {
                 // printf("%02x%04x: write dev %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
                 MCU_WriteDev_510(address, value);
             }
             else if (address >= 0x8000 && address <= 0xffff)
-            {
                 sram[address & 0xffff] = value;
-            }
             else
                 printf("%02x%04x: write-0 %02x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
         }
         else if (page == 0x8)
-        {
             sram[address & 0xffff] = value;
-        }
         else if (page == 0xe)
         {
             // XP
-            // printf("%02x%04x: write-e %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+            printf("%02x%04x: write-e %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
         }
         else if (page == 0xf)
         {
-            if (address == 0x00fe) // P0/PB?
+            // printf("%02x%04x: write-f %02x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
+            if (address == 0x00fe) // Buttons
                 io_sd = value;
             // else if (address == 0x00ff) // P1?
-            else if (address == 0xc11e)
-            {
-                // LCD_Enable(value == 0);
-            }
+            // else if (address == 0xc11e) // ??
             else if (address == 0xc11f)
             {
                 LCD_Write(0, value);
@@ -1449,6 +1445,12 @@ void MCU_Write(uint32_t address, uint8_t value)
             {
                 LCD_Write(1, value);
                 ga_lcd_counter = 500;
+
+                if (initial)
+                {
+                    initial = false;
+                    SDL_AtomicSet(&mcu_button_pressed, 0);
+                }
             }
             else
             {
@@ -1784,6 +1786,8 @@ void MCU_PostUART(uint8_t data)
 {
     uart_buffer[uart_write_ptr] = data;
     uart_write_ptr = (uart_write_ptr + 1) % uart_buffer_size;
+    if (mcu_sc88)
+        MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ2, 1);
 }
 
 void MCU_UpdateUART_RX(void)
@@ -1896,10 +1900,8 @@ int SDLCALL work_thread(void* data)
                 ga_lcd_counter--;
                 if (ga_lcd_counter == 0)
                 {
-                    MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 0);
-                    MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 1);
-                    // MCU_GA_SetGAInt(1, 0);
-                    // MCU_GA_SetGAInt(1, 1);
+                    MCU_GA_SetGAInt(1, 0);
+                    MCU_GA_SetGAInt(1, 1);
                 }
             }
         }

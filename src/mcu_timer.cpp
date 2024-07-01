@@ -310,6 +310,11 @@ void TIMER_Clock(uint64_t cycles)
                 if ((timer_cycles & 3) == 0)
                     timer_step = 1;
             }
+            else if (mcu_sc88)
+            {
+                if ((timer_cycles & 3) == 0)
+                    timer_step = 1;
+            }
             else
             {
                 if ((timer_cycles & 1) == 0)

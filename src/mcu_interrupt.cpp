@@ -76,6 +76,7 @@ void MCU_Interrupt_StartVector(uint32_t vector, int32_t mask)
     MCU_Interrupt_Start(mask);
     mcu.cp = address >> 16;
     mcu.pc = address;
+    // printf("pc %02x%04x INT START vector=%04x mask=%04x sr=%02x\n", mcu.cp, mcu.pc, vector, mask, mcu.sr >> 8);
 }
 
 void MCU_Interrupt_Handle(void)
@@ -141,8 +142,8 @@ void MCU_Interrupt_Handle(void)
         switch (i)
         {
             case INTERRUPT_SOURCE_IRQ0:
-                // if ((dev_IRQCR & 0b0001) == 0)
-                //     continue;
+                if ((dev_IRQCR & 0b0001) == 0)
+                    continue;
                 vector = VECTOR_IRQ0;
                 level = (dev_register[DEV_IPRA] >> 4) & 7;
                 // printf("IRQ VECTOR_IRQ0\n");
@@ -153,22 +154,22 @@ void MCU_Interrupt_Handle(void)
                 // printf("IRQ VECTOR_WDT\n");
                 break;
             case INTERRUPT_SOURCE_IRQ1:
-                // if ((dev_IRQCR & 0b0010) == 0)
-                //     continue;
+                if ((dev_IRQCR & 0b0010) == 0)
+                    continue;
                 vector = VECTOR_IRQ1;
                 level = (dev_register[DEV_IPRA] >> 0) & 7;
                 // printf("IRQ VECTOR_IRQ1\n");
                 break;
             case INTERRUPT_SOURCE_IRQ2:
-                // if ((dev_IRQCR & 0b0100) == 0)
-                //     continue;
+                if ((dev_IRQCR & 0b0100) == 0)
+                    continue;
                 vector = VECTOR_IRQ2;
                 level = (dev_register[DEV_IPRA] >> 0) & 7;
                 // printf("IRQ VECTOR_IRQ2\n");
                 break;
             case INTERRUPT_SOURCE_IRQ3:
-                // if ((dev_IRQCR & 0b1000) == 0)
-                //     continue;
+                if ((dev_IRQCR & 0b1000) == 0)
+                    continue;
                 vector = VECTOR_IRQ3;
                 level = (dev_register[DEV_IPRA] >> 0) & 7;
                 // printf("IRQ VECTOR_IRQ3\n");
