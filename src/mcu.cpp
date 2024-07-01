@@ -130,6 +130,13 @@ const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
     "waverom2.bin",
     "rom_sm.bin",
     "",
+
+    "",
+    "rd500_rom.bin",
+    "rd500_waverom1.bin",
+    "rd500_waverom2.bin",
+    "rd500_waverom3.bin",
+    "rd500_waverom4.bin"
 };
 
 int romset = ROM_SET_MK2;
