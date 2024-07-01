@@ -347,50 +347,65 @@ void TIMER_Clock(uint64_t cycles)
                 MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_CMIB, 1);
         }
         
-        int32_t wdt_step = 0;
 
-        switch (dev_WDT_TCSR & 7)
+        if ((dev_WDT_TCSR & 0x20) == 0)
         {
-        case 0:  // o / 2
-            if ((timer_cycles & 1) == 0)
-                wdt_step = 1;
-        case 1: // o / 32
-            if ((timer_cycles & 31) == 0)
-                wdt_step = 1;
-            break;
-        case 2: // o / 64
-            if ((timer_cycles & 63) == 0)
-                wdt_step = 1;
-            break;
-        case 3: // o / 128
-            if ((timer_cycles & 127) == 0)
-                wdt_step = 1;
-            break;
-        case 4: // o / 256
-            if ((timer_cycles & 255) == 0)
-                wdt_step = 1;
-            break;
-        case 5: // o / 512
-            if ((timer_cycles & 511) == 0)
-                wdt_step = 1;
-            break;
-        case 6: // o / 2048
-            if ((timer_cycles & 2047) == 0)
-                wdt_step = 1;
-            break;
-        case 7: // o / 4096
-            if ((timer_cycles & 4095) == 0)
-                wdt_step = 1;
-            break;
+            dev_WDT_TCNT = 0;
+            // printf("wdt disabled\n");
         }
-        if (wdt_step)
+        else
         {
-            // TODO: enable
-            dev_WDT_TCNT++;
+            int32_t wdt_step = 0;
 
-            if (dev_WDT_TCNT == 0)
+            switch (dev_WDT_TCSR & 7)
             {
-                // MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_WDT, 1);
+            case 0:  // o / 2
+                if ((timer_cycles & 1) == 0)
+                    wdt_step = 1;
+                break;
+            case 1: // o / 32
+                if ((timer_cycles & 31) == 0)
+                    wdt_step = 1;
+                break;
+            case 2: // o / 64
+                if ((timer_cycles & 63) == 0)
+                    wdt_step = 1;
+                break;
+            case 3: // o / 128
+                if ((timer_cycles & 127) == 0)
+                    wdt_step = 1;
+                break;
+            case 4: // o / 256
+                if ((timer_cycles & 255) == 0)
+                    wdt_step = 1;
+                break;
+            case 5: // o / 512
+                if ((timer_cycles & 511) == 0)
+                    wdt_step = 1;
+                break;
+            case 6: // o / 2048
+                if ((timer_cycles & 2047) == 0)
+                    wdt_step = 1;
+                break;
+            case 7: // o / 4096
+                if ((timer_cycles & 4095) == 0)
+                    wdt_step = 1;
+                break;
+            }
+            if (wdt_step)
+            {
+                bool overflow = ((int)dev_WDT_TCNT + 1) > 0xff;
+                dev_WDT_TCNT++;
+                // printf("wdt step %x %x\n", dev_WDT_TCNT, overflow);
+
+                if (overflow)
+                {
+                    dev_WDT_TCSR |= 0x80;
+                    if (overflow && (dev_WDT_TCSR & 0x40) == 0)
+                        MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_WDT, 1);
+                    else if (overflow)
+                        MCU_Reset();
+                }
             }
         }
 

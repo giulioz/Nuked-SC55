@@ -500,7 +500,7 @@ void LCD_Update(void)
         }
         else
         {
-            if (mcu_jv880 || mcu_xp10 || mcu_rd500)
+            if (mcu_jv880 || mcu_xp10 || mcu_rd500 || mcu_ra30)
             {
                 uint32_t back_color = 0xFF03be51;
                 for (size_t i = 0; i < lcd_height; i++) {
@@ -518,7 +518,7 @@ void LCD_Update(void)
                 }
             }
 
-            if (mcu_rd500)
+            if (mcu_rd500 || mcu_ra30)
             {
                 LCD_RenderSegments(10 + 40 * 0, 10, LCD_7SEG[0]);
                 LCD_RenderSegments(10 + 40 * 1, 10, LCD_7SEG[1]);

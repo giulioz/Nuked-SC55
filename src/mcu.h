@@ -496,7 +496,9 @@ enum {
     ROM_SET_SC155MK2,
     ROM_SET_RD500,
     ROM_SET_SC88,
+    ROM_SET_SC88VL,
     ROM_SET_XP10,
+    ROM_SET_RA30,
     ROM_SET_COUNT
 };
 
@@ -512,7 +514,9 @@ extern int mcu_scb55;
 extern int mcu_sc155;
 extern int mcu_rd500;
 extern int mcu_sc88;
+extern int mcu_sc88vl;
 extern int mcu_xp10;
+extern int mcu_ra30;
 
 extern SDL_atomic_t mcu_button_pressed;
 
@@ -521,6 +525,7 @@ extern uint32_t uart_write_ptr;
 extern uint32_t uart_read_ptr;
 extern uint8_t uart_buffer[uart_buffer_size];
 
+void MCU_Reset(void);
 uint8_t MCU_ReadP0(void);
 uint8_t MCU_ReadP1(void);
 void MCU_WriteP0(uint8_t data);

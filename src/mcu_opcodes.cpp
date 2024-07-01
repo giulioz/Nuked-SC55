@@ -404,6 +404,11 @@ void MCU_Jump_JMP(uint8_t operand)
             mcu.cp = (uint8_t)MCU_PopStack();
             mcu.pc = MCU_PopStack();
         }
+        else if (opcode_h == 0x18)
+        {
+            mcu.cp = mcu.r[opcode_l] & 0xff;
+            mcu.pc = mcu.r[opcode_l + 1];
+        }
         else if (opcode_h == 0x19)
         {
             // printf("pc %02x%04x sp %02x%04x JMP_19_\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7]);
@@ -423,6 +428,17 @@ void MCU_Jump_JMP(uint8_t operand)
             // printf("pc %02x%04x sp %02x%04x JMP_1b_\n", mcu.cp, mcu.pc - 1, mcu.tp, mcu.r[7]);
             MCU_PushStack(mcu.pc);
             mcu.pc = mcu.r[opcode_l];
+        }
+        else if (opcode_h == 0x1c)
+        {
+            mcu.pc = mcu.r[opcode_l] + MCU_ReadCodeAdvance();
+        }
+        else if (opcode_h == 0x1e)
+        {
+            uint32_t addr;
+            addr = MCU_ReadCodeAdvance() << 8;
+            addr |= MCU_ReadCodeAdvance();
+            mcu.pc = mcu.r[opcode_l] + addr;
         }
         else
         {
