@@ -448,6 +448,7 @@ enum {
     ROM_SET_SC155,
     ROM_SET_SC155MK2,
     ROM_SET_RD500,
+    ROM_SET_SC88,
     ROM_SET_COUNT
 };
 
@@ -462,6 +463,7 @@ extern int mcu_jv880;
 extern int mcu_scb55;
 extern int mcu_sc155;
 extern int mcu_rd500;
+extern int mcu_sc88;
 
 extern SDL_atomic_t mcu_button_pressed;
 
