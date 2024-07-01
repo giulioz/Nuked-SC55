@@ -49,12 +49,16 @@ enum {
     DEV_FRT1_FRCL = 0x13,
     DEV_FRT1_OCRAH = 0x14,
     DEV_FRT1_OCRAL = 0x15,
+    DEV_FRT1_OCRBH = 0x16,
+    DEV_FRT1_OCRBL = 0x17,
     DEV_FRT2_TCR = 0x20,
     DEV_FRT2_TCSR = 0x21,
     DEV_FRT2_FRCH = 0x22,
     DEV_FRT2_FRCL = 0x23,
     DEV_FRT2_OCRAH = 0x24,
     DEV_FRT2_OCRAL = 0x25,
+    DEV_FRT2_OCRBH = 0x26,
+    DEV_FRT2_OCRBL = 0x27,
     DEV_FRT3_TCR = 0x30,
     DEV_FRT3_TCSR = 0x31,
     DEV_FRT3_FRCH = 0x32,
@@ -362,7 +366,7 @@ inline void MCU_SetStatus(uint32_t condition, uint32_t mask)
 
 inline void MCU_PushStack(uint16_t data)
 {
-    printf("push SP %04x => %04x\n", mcu.r[7], mcu.r[7] - 2);
+    // printf("push SP %04x => %04x\n", mcu.r[7], mcu.r[7] - 2);
     if (mcu.r[7] & 1)
         MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
     mcu.r[7] -= 2;
@@ -371,7 +375,7 @@ inline void MCU_PushStack(uint16_t data)
 
 inline uint16_t MCU_PopStack(void)
 {
-    printf("pop SP %04x => %04x\n", mcu.r[7], mcu.r[7] + 2);
+    // printf("pop SP %04x => %04x\n", mcu.r[7], mcu.r[7] + 2);
     uint16_t ret;
     if (mcu.r[7] & 1)
         MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
@@ -434,6 +438,49 @@ enum {
     MCU_BUTTON_EDIT = 11,
     MCU_BUTTON_SYSTEM = 12,
     MCU_BUTTON_RHYTHM = 13,
+
+    // XP10
+    MCU_XP10_BUTTON_SPLIT = 0,
+    MCU_XP10_BUTTON_PARTM = 1,
+    MCU_XP10_BUTTON_VALUEM = 2,
+    MCU_XP10_BUTTON_EMPTY = 3,
+    // MCU_XP10_LED_SPLIT = 4,
+
+    MCU_XP10_BUTTON_DUAL = 4,
+    MCU_XP10_BUTTON_PARTP = 5,
+    MCU_XP10_BUTTON_VALUEP = 6,
+    MCU_XP10_BUTTON_TONE = 7,
+    // MCU_XP10_LED_DUAL = 9,
+    
+    MCU_XP10_BUTTON_XDUAL = 8,
+    MCU_XP10_BUTTON_PERFORM = 9,
+    MCU_XP10_BUTTON_1 = 10,
+    MCU_XP10_BUTTON_6 = 11,
+    // MCU_XP10_LED_XDUAL = 14,
+
+    MCU_XP10_BUTTON_ARPEGGIO = 12,
+    MCU_XP10_BUTTON_SELECT = 13,
+    MCU_XP10_BUTTON_2 = 14,
+    MCU_XP10_BUTTON_7 = 15,
+    // MCU_XP10_LED_ARPEGGIO = 19,
+
+    MCU_XP10_BUTTON_TRANSPOSE = 16,
+    MCU_XP10_BUTTON_3 = 17,
+    MCU_XP10_BUTTON_8 = 18,
+    MCU_XP10_BUTTON_9 = 19,
+    // MCU_XP10_LED_TRANSPOSE = 24,
+
+    MCU_XP10_BUTTON_EDIT = 20,
+    MCU_XP10_BUTTON_4 = 21,
+    MCU_XP10_BUTTON_5 = 22,
+    MCU_XP10_BUTTON_0 = 23,
+    // MCU_XP10_LED_EDIT = 29,
+
+    MCU_XP10_BUTTON_UTILITY = 24,
+    MCU_XP10_BUTTON_SEQCTRL = 25,
+    MCU_XP10_BUTTON_VARIATION = 26,
+    MCU_XP10_BUTTON_ENTER = 27,
+    // MCU_XP10_LED_UTILITY = 34,
 };
 
 
@@ -449,6 +496,7 @@ enum {
     ROM_SET_SC155MK2,
     ROM_SET_RD500,
     ROM_SET_SC88,
+    ROM_SET_XP10,
     ROM_SET_COUNT
 };
 
@@ -464,6 +512,7 @@ extern int mcu_scb55;
 extern int mcu_sc155;
 extern int mcu_rd500;
 extern int mcu_sc88;
+extern int mcu_xp10;
 
 extern SDL_atomic_t mcu_button_pressed;
 

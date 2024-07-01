@@ -44,7 +44,7 @@
 #include "utils/files.h"
 
 
-static uint32_t LCD_DL, LCD_N, LCD_F, LCD_D, LCD_C, LCD_B, LCD_ID, LCD_S;
+static uint32_t LCD_DL, LCD_N, LCD_F, LCD_D, LCD_C, LCD_B, LCD_ID = 1, LCD_S;
 static uint32_t LCD_DD_RAM, LCD_AC, LCD_CG_RAM;
 static uint32_t LCD_RAM_MODE = 0;
 static uint8_t LCD_Data[80];
@@ -223,6 +223,40 @@ const int button_map_jv880[][2] =
 const int button_map_rd500[][2] =
 {
     // TODO
+};
+
+const int button_map_xp10[][2] =
+{
+    SDL_SCANCODE_I, MCU_XP10_BUTTON_UTILITY,
+    SDL_SCANCODE_U, MCU_XP10_BUTTON_EDIT,
+    SDL_SCANCODE_Y, MCU_XP10_BUTTON_TRANSPOSE,
+    SDL_SCANCODE_R, MCU_XP10_BUTTON_ARPEGGIO,
+    SDL_SCANCODE_E, MCU_XP10_BUTTON_XDUAL,
+    SDL_SCANCODE_W, MCU_XP10_BUTTON_DUAL,
+    SDL_SCANCODE_Q, MCU_XP10_BUTTON_SPLIT,
+    SDL_SCANCODE_O, MCU_XP10_BUTTON_SEQCTRL,
+    SDL_SCANCODE_T, MCU_XP10_BUTTON_SELECT,
+    
+    SDL_SCANCODE_D, MCU_XP10_BUTTON_PERFORM,
+    SDL_SCANCODE_S, MCU_XP10_BUTTON_PARTP,
+    SDL_SCANCODE_A, MCU_XP10_BUTTON_PARTM,
+    SDL_SCANCODE_F, MCU_XP10_BUTTON_VARIATION,
+
+    SDL_SCANCODE_X, MCU_XP10_BUTTON_VALUEP,
+    SDL_SCANCODE_Z, MCU_XP10_BUTTON_VALUEM,
+    SDL_SCANCODE_V, MCU_XP10_BUTTON_ENTER,
+    SDL_SCANCODE_C, MCU_XP10_BUTTON_TONE,
+    
+    SDL_SCANCODE_1, MCU_XP10_BUTTON_1,
+    SDL_SCANCODE_2, MCU_XP10_BUTTON_2,
+    SDL_SCANCODE_3, MCU_XP10_BUTTON_3,
+    SDL_SCANCODE_4, MCU_XP10_BUTTON_4,
+    SDL_SCANCODE_5, MCU_XP10_BUTTON_5,
+    SDL_SCANCODE_6, MCU_XP10_BUTTON_6,
+    SDL_SCANCODE_7, MCU_XP10_BUTTON_7,
+    SDL_SCANCODE_8, MCU_XP10_BUTTON_8,
+    SDL_SCANCODE_9, MCU_XP10_BUTTON_9,
+    SDL_SCANCODE_0, MCU_XP10_BUTTON_0,
 };
 
 
@@ -427,11 +461,12 @@ void LCD_Update(void)
         }
         else
         {
-            if (mcu_jv880)
+            if (mcu_jv880 || mcu_xp10)
             {
+                uint32_t back_color = 0xFF03be51;
                 for (size_t i = 0; i < lcd_height; i++) {
                     for (size_t j = 0; j < lcd_width; j++) {
-                        lcd_buffer[i][j] = 0xFF03be51;
+                        lcd_buffer[i][j] = back_color;
                     }
                 }
             }
@@ -444,11 +479,12 @@ void LCD_Update(void)
                 }
             }
 
-            if (mcu_jv880)
+            if (mcu_jv880 || mcu_xp10)
             {
+                int width = mcu_jv880 ? 24 : 16;
                 for (int i = 0; i < 2; i++)
                 {
-                    for (int j = 0; j < 24; j++)
+                    for (int j = 0; j < width; j++)
                     {
                         uint8_t ch = LCD_Data[i * 40 + j];
                         LCD_FontRenderStandard(4 + i * 50, 4 + j * 34, ch);
@@ -546,12 +582,26 @@ void LCD_Update(void)
             {
                 if (sdl_event.key.repeat)
                     continue;
+
+                if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYDOWN)
+                {
+                    MCU_PostUART(0x90);
+                    MCU_PostUART(0x30);
+                    MCU_PostUART(0x7f);
+                }
+                else if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYUP)
+                {
+                    MCU_PostUART(0x80);
+                    MCU_PostUART(0x30);
+                    MCU_PostUART(0);
+                }
                 
                 int mask = 0;
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
 
-                auto button_map = mcu_rd500 ? button_map_rd500 : mcu_jv880 ? button_map_jv880 : button_map_sc55;
+                auto button_map = mcu_xp10 ? button_map_xp10 : mcu_rd500 ? button_map_rd500 : mcu_jv880 ? button_map_jv880 : button_map_sc55;
                 auto button_size = (
+                    mcu_xp10 ? sizeof(button_map_xp10) :
                     mcu_rd500 ? sizeof(button_map_rd500) :
                     mcu_jv880 ? sizeof(button_map_jv880) :
                     sizeof(button_map_sc55)
