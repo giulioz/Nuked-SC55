@@ -850,13 +850,14 @@ uint8_t MCU_Read(uint32_t address)
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
 
                 if (io_sd == 0x1)
-                    data &= ((button_pressed >> 0) & 0b11111) ^ 0xFF;
+                    data &= ((button_pressed >> 0) & 0xff) ^ 0xff;
                 if (io_sd == 0x2)
-                    data &= ((button_pressed >> 5) & 0b11111) ^ 0xFF;
+                    data &= ((button_pressed >> 8) & 0xff) ^ 0xff;
                 if (io_sd == 0x4)
-                    data &= ((button_pressed >> 10) & 0b1111) ^ 0xFF;
+                    data &= ((button_pressed >> 16) & 0xff) ^ 0xff;
+                if (io_sd == 0x8)
+                    data &= ((button_pressed >> 24) & 0xff) ^ 0xff;
 
-                data |= 0b10000000;
                 ret = data;
             }
             else if (address == 0xc104)
