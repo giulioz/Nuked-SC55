@@ -163,8 +163,8 @@ const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
 
     "",
     "Roland_XP-10_Ver1.02_96-10-11.bin",
-    "waverom1.bin",
-    "waverom2.bin",
+    "jv880_waverom1.bin", // FIXME
+    "jv880_waverom2.bin", // FIXME
     "",
     "",
 };
@@ -221,6 +221,8 @@ static uint16_t ad_val[4];
 static uint8_t ad_nibble = 0x00;
 static uint8_t sw_pos = 3;
 static uint8_t io_sd = 0x00;
+static uint8_t led_7seg_out = 0x00;
+static uint8_t last_io_sd = 0;
 
 SDL_atomic_t mcu_button_pressed = { 0 };
 
@@ -725,6 +727,14 @@ uint8_t MCU_Read(uint32_t address)
             {
                 ret = rom2[address];
             }
+            else if (address == 0xfe87) // P4DR, button scan read
+            {
+                ret = 0x00;
+            }
+            else if (address == 0xfe8b) // P6DR, pedals
+            {
+                //printf("pedals\n");
+            }
             else if (address >= 0xfe80 && address <= 0xff1f)
             {
                 ret = MCU_ReadDev_510(address);
@@ -763,7 +773,7 @@ uint8_t MCU_Read(uint32_t address)
         if (page == 0)
         {
             if (address == 0xfe8a) ret = 0b00101101; // P5DR
-            else if (address < 0xfe80)
+            else if (address < 0x8000)
             {
                 ret = rom2[address];
             }
@@ -1181,6 +1191,14 @@ void MCU_WriteDev_510(uint32_t address, uint8_t value)
         printf("%02x%04x: write dev %02x%04x %02x\n", mcu.cp, mcu.pc, 0, address, value);
 }
 
+uint8_t reverse_byte(uint8_t b)
+{
+   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+   return b;
+}
+
 void MCU_Write(uint32_t address, uint8_t value)
 {
     uint32_t address_full = address;
@@ -1192,7 +1210,31 @@ void MCU_Write(uint32_t address, uint8_t value)
         uint8_t page = (address_full >> 16) & 0xff;
         if (page == 0)
         {
-            if (address >= 0xfe80 && address <= 0xff1f)
+            if (address == 0xfe86) // P3DR, button scan select
+            {
+                io_sd = value >> 5;
+                bool low = (value >> 4) & 1;
+                led_7seg_out = low | led_7seg_out & 0xFF;
+
+                // We need to use this trick otherwise the ROM will write 0 multiple times and it will flicker
+                if (last_io_sd == io_sd)
+                {
+                    if (io_sd == 5) LCD_Write_7seg(0, led_7seg_out);
+                    if (io_sd == 6) LCD_Write_7seg(1, led_7seg_out);
+                    if (io_sd == 7) LCD_Write_7seg(2, led_7seg_out);
+                }
+                last_io_sd = io_sd;
+            }
+            else if (address == 0xfe8a) // P5DR, led out
+            {
+                value = reverse_byte(value);
+                led_7seg_out = (value << 1);
+            }
+            else if (address == 0xfe8b) // P6DR, analog MPX
+            {
+                //printf("analog MPX %x\n", value);
+            }
+            else if (address >= 0xfe80 && address <= 0xff1f)
             {
                 MCU_WriteDev_510(address, value);
             }
@@ -1239,10 +1281,10 @@ void MCU_Write(uint32_t address, uint8_t value)
             sram[address & 0xffff] = value;
             // printf("%x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
         }
-        else if (page == 0xf)
-        {
-            printf("%02x%04x: write %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
-        }
+        // else if (page == 0xf)
+        // {
+        //     printf("%02x%04x: write %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+        // }
         else
             printf("%x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
         return;
@@ -1599,14 +1641,8 @@ int SDLCALL work_thread(void* data)
         else
             mcu.ex_ignore = 0;
 
-        if (mcu.cp == 0x15 && mcu.pc == 0x2286)
-            mcu.dp = 0x11;
-        if (mcu.cp == 0x15 && mcu.pc == 0x2293)
-            mcu.dp = 0x12;
-            // printf("here dp: %02x\n", mcu.dp);
 
         // printf("pc %02x%04x sp %02x%04x\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
-        // printf("pc %02x%04x dp %02x\n", mcu.cp, mcu.pc, mcu.dp);
         if (!mcu.sleep)
             MCU_ReadInstruction();
 
@@ -2165,6 +2201,10 @@ int main(int argc, char *argv[])
             break;
         case ROM_SET_RD500:
             mcu_rd500 = true;
+            lcd_width = 128;
+            lcd_height = 70;
+            lcd_col1 = 0x000000;
+            lcd_col2 = 0x78b500;
             break;
         case ROM_SET_XP10:
             mcu_xp10 = true;

@@ -61,7 +61,7 @@ uint8_t PCM_ReadROM(uint32_t address)
             else
                 return waverom1[address & 0x1fffff];
         case 1:
-            if (!mcu_jv880 && !mcu_rd500)
+            if (!mcu_jv880 && !mcu_rd500 && !mcu_xp10)
                 return waverom2[address & 0xfffff];
             else
                 return waverom2[address & 0x1fffff];
@@ -1577,6 +1577,6 @@ void PCM_Update(uint64_t cycles)
 
         int cycles = (reg_slots + 1) * 25;
 
-        pcm.cycles += mcu_jv880 ? (cycles * 25) / 29 : cycles;
+        pcm.cycles += mcu_jv880 || mcu_rd500 ? (cycles * 25) / 29 : cycles;
     }
 }

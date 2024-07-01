@@ -49,6 +49,7 @@ static uint32_t LCD_DD_RAM, LCD_AC, LCD_CG_RAM;
 static uint32_t LCD_RAM_MODE = 0;
 static uint8_t LCD_Data[80];
 static uint8_t LCD_CG[64];
+static uint8_t LCD_7SEG[3];
 
 static uint8_t lcd_enable = 1;
 static bool lcd_quit_requested = false;
@@ -160,6 +161,11 @@ void LCD_Write(uint32_t address, uint8_t data)
     //     printf("%c\n", data);
     //else
     //    printf("\n");
+}
+
+void LCD_Write_7seg(uint8_t address, uint8_t data)
+{
+    LCD_7SEG[address] = data;
 }
 
 int lcd_width = 741;
@@ -446,6 +452,39 @@ void LCD_FontRenderLR(uint8_t ch)
     }
 }
 
+void LCD_HorizontalSegment(int x, int y, int length, int thickness)
+{
+    for (int i = 0; i < thickness; i++) {
+        for (int j = 0; j < length; j++) {
+            lcd_buffer[y + i][x + j] = 1;
+        }
+    }
+}
+
+void LCD_VerticalSegment(int x, int y, int length, int thickness)
+{
+    for (int i = 0; i < length; i++) {
+        for (int j = 0; j < thickness; j++) {
+            lcd_buffer[y + i][x + j] = 1;
+        }
+    }
+}
+
+void LCD_RenderSegments(int32_t x, int32_t y, uint8_t digit)
+{
+    int segmentLength = 20;
+    int segmentThickness = 3;
+
+    if (digit & 0x01) LCD_HorizontalSegment(x + segmentThickness, y, segmentLength, segmentThickness);
+    if (digit & 0x02) LCD_VerticalSegment(x + segmentLength + segmentThickness, y + segmentThickness, segmentLength, segmentThickness);
+    if (digit & 0x04) LCD_VerticalSegment(x + segmentLength + segmentThickness, y + 2 * segmentThickness + segmentLength, segmentLength, segmentThickness);
+    if (digit & 0x08) LCD_HorizontalSegment(x + segmentThickness, y + 2 * (segmentThickness + segmentLength), segmentLength, segmentThickness);
+    if (digit & 0x10) LCD_VerticalSegment(x, y + 2 * segmentThickness + segmentLength, segmentLength, segmentThickness);
+    if (digit & 0x20) LCD_VerticalSegment(x, y + segmentThickness, segmentLength, segmentThickness);
+    if (digit & 0x40) LCD_HorizontalSegment(x + segmentThickness, y + segmentThickness + segmentLength, segmentLength, segmentThickness);
+    if (digit & 0x80) LCD_HorizontalSegment(x + segmentLength + 3 * segmentThickness, y + 2 * (segmentThickness + segmentLength), segmentThickness, segmentThickness);
+}
+
 void LCD_Update(void)
 {
     if (!lcd_init)
@@ -461,7 +500,7 @@ void LCD_Update(void)
         }
         else
         {
-            if (mcu_jv880 || mcu_xp10)
+            if (mcu_jv880 || mcu_xp10 || mcu_rd500)
             {
                 uint32_t back_color = 0xFF03be51;
                 for (size_t i = 0; i < lcd_height; i++) {
@@ -479,7 +518,13 @@ void LCD_Update(void)
                 }
             }
 
-            if (mcu_jv880 || mcu_xp10)
+            if (mcu_rd500)
+            {
+                LCD_RenderSegments(10 + 40 * 0, 10, LCD_7SEG[0]);
+                LCD_RenderSegments(10 + 40 * 1, 10, LCD_7SEG[1]);
+                LCD_RenderSegments(10 + 40 * 2, 10, LCD_7SEG[2]);
+            }
+            else if (mcu_jv880 || mcu_xp10)
             {
                 int width = mcu_jv880 ? 24 : 16;
                 for (int i = 0; i < 2; i++)

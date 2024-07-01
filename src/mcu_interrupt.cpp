@@ -37,7 +37,6 @@
 
 void MCU_Interrupt_Start(int32_t mask)
 {
-    // printf("pc %02x%04x sp %02x%04x Interrupt Start\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
     MCU_PushStack(mcu.pc);
     MCU_PushStack(mcu.cp);
     MCU_PushStack(mcu.sr);
