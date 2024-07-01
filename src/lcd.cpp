@@ -208,6 +208,42 @@ const int button_map_sc55[][2] =
     SDL_SCANCODE_RIGHT, MCU_BUTTON_PART_R,
 };
 
+const int button_map_sc88[][2] =
+{
+    SDL_SCANCODE_W, MCU_SC88_BUTTON_INST_ALL,
+    SDL_SCANCODE_E, MCU_SC88_BUTTON_INST_MUTE,
+    SDL_SCANCODE_R, MCU_SC88_BUTTON_PART_L,
+    SDL_SCANCODE_T, MCU_SC88_BUTTON_PART_R,
+    SDL_SCANCODE_Y, MCU_SC88_BUTTON_INST_L,
+    SDL_SCANCODE_U, MCU_SC88_BUTTON_INST_R,
+    SDL_SCANCODE_I, MCU_SC88_BUTTON_KEY_SHIFT_L,
+    SDL_SCANCODE_O, MCU_SC88_BUTTON_KEY_SHIFT_R,
+    SDL_SCANCODE_P, MCU_SC88_BUTTON_LEVEL_L,
+    SDL_SCANCODE_LEFTBRACKET, MCU_SC88_BUTTON_LEVEL_R,
+    SDL_SCANCODE_A, MCU_SC88_BUTTON_MIDI_CH_L,
+    SDL_SCANCODE_S, MCU_SC88_BUTTON_MIDI_CH_R,
+    SDL_SCANCODE_D, MCU_SC88_BUTTON_PAN_L,
+    SDL_SCANCODE_F, MCU_SC88_BUTTON_PAN_R,
+    SDL_SCANCODE_G, MCU_SC88_BUTTON_REVERB_L,
+    SDL_SCANCODE_H, MCU_SC88_BUTTON_REVERB_R,
+    SDL_SCANCODE_J, MCU_SC88_BUTTON_CHORUS_L,
+    SDL_SCANCODE_K, MCU_SC88_BUTTON_CHORUS_R,
+    SDL_SCANCODE_LEFT, MCU_SC88_BUTTON_PART_L,
+    SDL_SCANCODE_RIGHT, MCU_SC88_BUTTON_PART_R,
+
+    SDL_SCANCODE_1, MCU_SC88_BUTTON_EQ,
+    SDL_SCANCODE_2, MCU_SC88_BUTTON_INSTMAP,
+    SDL_SCANCODE_3, MCU_SC88_BUTTON_USER_INST,
+    SDL_SCANCODE_4, MCU_SC88_BUTTON_EDIT,
+    SDL_SCANCODE_Z, MCU_SC88_BUTTON_VIB_RATE_L,
+    SDL_SCANCODE_X, MCU_SC88_BUTTON_VIB_RATE_R,
+    SDL_SCANCODE_C, MCU_SC88_BUTTON_VIB_DEPTH_L,
+    SDL_SCANCODE_V, MCU_SC88_BUTTON_VIB_DEPTH_R,
+    SDL_SCANCODE_B, MCU_SC88_BUTTON_VIB_DELAY_L,
+    SDL_SCANCODE_N, MCU_SC88_BUTTON_VIB_DELAY_R,
+    SDL_SCANCODE_RETURN, MCU_SC88_BUTTON_PREVIEW,
+};
+
 const int button_map_jv880[][2] =
 {
     SDL_SCANCODE_P, MCU_BUTTON_PREVIEW,
@@ -644,11 +680,17 @@ void LCD_Update(void)
                 int mask = 0;
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
 
-                auto button_map = mcu_xp10 ? button_map_xp10 : mcu_rd500 ? button_map_rd500 : mcu_jv880 ? button_map_jv880 : button_map_sc55;
+                auto button_map =
+                    mcu_xp10 ? button_map_xp10 :
+                    mcu_rd500 ? button_map_rd500 :
+                    mcu_jv880 ? button_map_jv880 :
+                    mcu_sc88 ? button_map_sc88 :
+                    button_map_sc55;
                 auto button_size = (
                     mcu_xp10 ? sizeof(button_map_xp10) :
                     mcu_rd500 ? sizeof(button_map_rd500) :
                     mcu_jv880 ? sizeof(button_map_jv880) :
+                    mcu_sc88 ? sizeof(button_map_sc88) :
                     sizeof(button_map_sc55)
                 ) / sizeof(button_map_sc55[0]);
                 for (size_t i = 0; i < button_size; i++)
