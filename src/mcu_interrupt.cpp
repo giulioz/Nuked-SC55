@@ -76,6 +76,7 @@ void MCU_Interrupt_StartVector(uint32_t vector, int32_t mask)
     MCU_Interrupt_Start(mask);
     mcu.cp = address >> 16;
     mcu.pc = address;
+    // printf("pc %02x%04x INT START vector=%04x mask=%04x sr=%02x\n", mcu.cp, mcu.pc, vector, mask, mcu.sr >> 8);
 }
 
 void MCU_Interrupt_Handle(void)

@@ -51,6 +51,18 @@
 #include <limits.h>
 #endif
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0') 
+
+
 const char* rs_name[ROM_SET_COUNT] = {
     "SC-55mk2",
     "SC-55st",
@@ -158,15 +170,15 @@ const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
 
     "",
     "Roland_XP-10_Ver1.02_96-10-11.bin",
-    "xp10_waverom1.bin",
-    "xp10_waverom2.bin",
+    "jv880_waverom1.bin", // FIXME
+    "jv880_waverom2.bin", // FIXME
     "",
     "",
-
+    
     "",
     "roland_ra30_program_R00892534.bin",
-    "ra30_waverom1.bin",
-    "ra30_waverom2.bin",
+    "waverom1.bin", // FIXME
+    "waverom2.bin", // FIXME
     "roland_ra30_stylerom_R00679623.bin",
     "",
 };
@@ -192,9 +204,11 @@ static int sample_write_ptr;
 
 static SDL_AudioDeviceID sdl_audio;
 
+bool failed = false;
 void MCU_ErrorTrap(void)
 {
-    printf("%.2x %.4x\n", mcu.cp, mcu.pc);
+    printf("ERROR %.2x %.4x\n", mcu.cp, mcu.pc);
+    // failed = true;
 }
 
 int mcu_mk1 = 0; // 0 - SC-55mkII, SC-55ST. 1 - SC-55, CM-300/SCC-1
@@ -227,6 +241,9 @@ static uint8_t io_sd = 0x00;
 static uint8_t led_7seg_out = 0x00;
 static uint8_t last_io_sd = 0;
 
+bool initial = true;
+// SDL_atomic_t mcu_button_pressed = { 1 << MCU_SC88_BUTTON_MIDI_CH_L | 1 << MCU_SC88_BUTTON_MIDI_CH_R };
+// SDL_atomic_t mcu_button_pressed = { 1 << MCU_SC88_BUTTON_KEY_SHIFT_L | 1 << MCU_SC88_BUTTON_KEY_SHIFT_R };
 SDL_atomic_t mcu_button_pressed = { 0 };
 
 uint8_t RCU_Read(void)
@@ -1326,6 +1343,12 @@ void MCU_Write(uint32_t address, uint8_t value)
             {
                 LCD_Write(1, value);
                 ga_lcd_counter = 1;
+
+                if (initial)
+                {
+                    initial = false;
+                    SDL_AtomicSet(&mcu_button_pressed, 0);
+                }
             }
             else
                 printf("%02x%04x: write-f %02x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
@@ -1698,6 +1721,10 @@ int SDLCALL work_thread(void* data)
         else
             mcu.ex_ignore = 0;
 
+        // if (mcu.cp == 0x01 && mcu.pc == 0x910D)
+        //     printf("here\n");
+
+        // printf("pc %02x%04x\n", mcu.cp, mcu.pc);
         if (!mcu.sleep)
             MCU_ReadInstruction();
 
@@ -1732,6 +1759,8 @@ int SDLCALL work_thread(void* data)
                 }
             }
         }
+
+        MIDI_Update();
     }
     MCU_WorkThread_Unlock();
 
@@ -1747,7 +1776,7 @@ static void MCU_Run()
     work_thread_run = true;
     SDL_Thread *thread = SDL_CreateThread(work_thread, "work thread", 0);
 
-    while (working)
+    while (working && !failed)
     {
         if(LCD_QuitRequested())
             working = false;

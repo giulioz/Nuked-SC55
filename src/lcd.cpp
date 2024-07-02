@@ -665,6 +665,19 @@ void LCD_Update(void)
                 if (sdl_event.key.repeat)
                     continue;
                 
+                if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYDOWN)
+                {
+                    MCU_PostUART(0x90);
+                    MCU_PostUART(0x30);
+                    MCU_PostUART(0x7f);
+                }
+                else if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYUP)
+                {
+                    MCU_PostUART(0x80);
+                    MCU_PostUART(0x30);
+                    MCU_PostUART(0);
+                }
+                
                 int mask = 0;
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
 

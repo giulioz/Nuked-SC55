@@ -147,6 +147,7 @@ void MCU_Operand_Sleep(uint8_t operand)
 
 void MCU_Operand_NotImplemented(uint8_t operand)
 {
+    printf("Operand %x not implemented\n", operand);
     MCU_ErrorTrap();
 }
 
@@ -748,6 +749,7 @@ void MCU_SetStatusCommon(uint32_t val, uint32_t siz)
 
 void MCU_Opcode_Short_NotImplemented(uint8_t opcode)
 {
+    printf("Opcode short %x not implemented\n", opcode);
     MCU_ErrorTrap();
 }
 
@@ -879,6 +881,7 @@ void MCU_Opcode_Short_CMP(uint8_t opcode)
 
 void MCU_Opcode_NotImplemented(uint8_t opcode, uint8_t opcode_reg)
 {
+    printf("Opcode %x %x not implemented\n", opcode, opcode_reg);
     MCU_ErrorTrap();
 }
 
