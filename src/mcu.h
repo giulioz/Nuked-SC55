@@ -34,6 +34,8 @@
 #pragma once
 
 #include <stdint.h>
+#include <string>
+#include <format>
 #include "mcu_interrupt.h"
 #include "SDL_atomic.h"
 
@@ -190,11 +192,27 @@ struct mcu_t {
 
 extern mcu_t mcu;
 
+// REVERSE STUFF
+extern bool recomp_is_code_addr[0x50000];
+extern uint32_t recomp_inst_count[0x50000];
+extern bool recomp_is_jmp_dest_addr[0x50000];
+extern bool recomp_is_call_dest_addr[0x50000];
+extern bool recomp_is_interrupt_dest_addr[0x50000];
+extern std::string recomp_code_conv_c[0x50000];
+extern uint32_t recomp_code_ptr;
+
+inline void recomp_push_code(std::string code, bool clear = false)
+{
+    // if (clear)
+    //     recomp_code_conv_c[recomp_code_ptr] = "";
+    // recomp_code_conv_c[recomp_code_ptr] += code;
+}
+
 void MCU_ErrorTrap(void);
 
-uint8_t MCU_Read(uint32_t address);
-uint16_t MCU_Read16(uint32_t address);
-uint32_t MCU_Read32(uint32_t address);
+uint8_t MCU_Read(uint32_t address, bool data = false);
+uint16_t MCU_Read16(uint32_t address, bool data = false);
+uint32_t MCU_Read32(uint32_t address, bool data = false);
 void MCU_Write(uint32_t address, uint8_t value);
 void MCU_Write16(uint32_t address, uint16_t value);
 
@@ -203,6 +221,13 @@ inline uint32_t MCU_GetAddress(uint8_t page, uint16_t address) {
 }
 
 inline uint8_t MCU_ReadCode(void) {
+    // uint32_t addr = MCU_GetAddress(mcu.cp, mcu.pc);
+    // if (addr > 0x50000) {
+    //     printf("oor! is_code_addr\n");
+    // } else {
+    //     recomp_is_code_addr[addr] = true;
+    // }
+
     return MCU_Read(MCU_GetAddress(mcu.cp, mcu.pc));
 }
 

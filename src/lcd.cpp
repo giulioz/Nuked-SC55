@@ -541,6 +541,8 @@ void LCD_Update(void)
             {
                 if (sdl_event.key.repeat)
                     continue;
+
+                printf("keydown: %d\n", sdl_event.key.keysym.scancode);
                 
                 int mask = 0;
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);

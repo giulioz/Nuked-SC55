@@ -91,18 +91,22 @@ void PCM_Write(uint32_t address, uint8_t data)
             case 0:
                 pcm.voice_mask_pending &= ~0xf000000;
                 pcm.voice_mask_pending |= (data & 0xf) << 24;
+                // printf("PCM write voice enable %02x %02x\n", address, data);
                 break;
             case 1:
                 pcm.voice_mask_pending &= ~0xff0000;
                 pcm.voice_mask_pending |= (data & 0xff) << 16;
+                // printf("PCM write voice enable %02x %02x\n", address, data);
                 break;
             case 2:
                 pcm.voice_mask_pending &= ~0xff00;
                 pcm.voice_mask_pending |= (data & 0xff) << 8;
+                // printf("PCM write voice enable %02x %02x\n", address, data);
                 break;
             case 3:
                 pcm.voice_mask_pending &= ~0xff;
                 pcm.voice_mask_pending |= (data & 0xff) << 0;
+                // printf("PCM write voice enable %02x %02x\n", address, data);
                 break;
         }
         pcm.voice_mask_updating = 1;
@@ -114,29 +118,35 @@ void PCM_Write(uint32_t address, uint8_t data)
             case 1:
                 pcm.wave_read_address &= ~0xff0000;
                 pcm.wave_read_address |= (data & 0xff) << 16;
+                // printf("PCM write rom read %02x\n", address, data);
                 break;
             case 2:
                 pcm.wave_read_address &= ~0xff00;
                 pcm.wave_read_address |= (data & 0xff) << 8;
+                // printf("PCM write rom read %02x\n", address, data);
                 break;
             case 3:
                 pcm.wave_read_address &= ~0xff;
                 pcm.wave_read_address |= (data & 0xff) << 0;
                 pcm.wave_byte_latch = PCM_ReadROM(pcm.wave_read_address);
+                // printf("PCM write rom read %02x\n", address, data);
                 break;
         }
     }
     else if (address == 0x3c)
     {
         pcm.config_reg_3c = data;
+        // printf("PCM write config 3c %02x %02x\n", address, data);
     }
     else if (address == 0x3d)
     {
         pcm.config_reg_3d = data;
+        // printf("PCM write config 3d %02x %02x\n", address, data);
     }
     else if (address == 0x3e)
     {
         pcm.select_channel = data & 0x1f;
+        // printf("PCM write select channel %02x %02x\n", address, data);
     }
     else if ((address >= 0x4 && address < 0x10) || (address >= 0x24 && address < 0x30))
     {
@@ -166,6 +176,19 @@ void PCM_Write(uint32_t address, uint8_t data)
                 ix |= 2;
 
             pcm.ram1[pcm.select_channel][ix] = pcm.write_latch;
+            // if (pcm.select_channel >= 0x1c)
+            //     printf("PCM write ram1 %02x %02x %08x\n", pcm.select_channel, ix, pcm.write_latch);
+            switch (ix)
+            {
+                // case 0: printf("PCM write ram1 %02x %02x %08x addressEnd\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 1: printf("PCM write ram1 %02x %02x %08x filterTempHPF\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 2: printf("PCM write ram1 %02x %02x %08x addressLoop\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 3: printf("PCM write ram1 %02x %02x %08x filterTempLPF\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 4: printf("PCM write ram1 %02x %02x %08x address\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 5: printf("PCM write ram1 %02x %02x %08x tempReference\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 6: printf("PCM write ram1 %02x %02x %08x v6\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 7: printf("PCM write ram1 %02x %02x %08x v7\n", pcm.select_channel, ix, pcm.write_latch);
+            }
         }
     }
     else if ((address >= 0x10 && address < 0x20) || (address >= 0x30 && address < 0x38))
@@ -187,7 +210,31 @@ void PCM_Write(uint32_t address, uint8_t data)
             if (address & 32)
                 ix |= 8;
 
+            // if (pcm.select_channel < 0x1c)
             pcm.ram2[pcm.select_channel][ix] = pcm.write_latch;
+            if (ix == 0x06)
+                printf("%02x%04x: PCM write ram2 %02x %02x %04x\n", mcu.cp, mcu.pc, pcm.select_channel, ix, pcm.write_latch & 0xffff);
+            // if (pcm.select_channel >= 0x1d)
+            //     printf("PCM write ram2 %02x %02x %04x\n", pcm.select_channel, ix, pcm.write_latch);
+            switch (ix)
+            {
+                // case 0: printf("PCM write ram2 %02x %02x %04x pitch\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 1: printf("PCM write ram2 %02x %02x %04x pan\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 2: printf("PCM write ram2 %02x %02x %04x revChorSend\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 3: printf("PCM write ram2 %02x %02x %04x volume1\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 4: printf("PCM write ram2 %02x %02x %04x volume2\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 5: printf("PCM write ram2 %02x %02x %04x cutoff\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 6: printf("PCM write ram2 %02x %02x %04x resonanceFlags\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 7: printf("PCM write ram2 %02x %02x %04x addrLoopFlags\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 8: printf("PCM write ram2 %02x %02x %04x subPhaseState\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 9: printf("PCM write ram2 %02x %02x %04x volume1TV\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 10: printf("PCM write ram2 %02x %02x %04x volume2TV\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 11: printf("PCM write ram2 %02x %02x %04x cutoffTV\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 12: printf("PCM write ram2 %02x %02x %04x v12\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 13: printf("PCM write ram2 %02x %02x %04x v13\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 14: printf("PCM write ram2 %02x %02x %04x v14\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 15: printf("PCM write ram2 %02x %02x %04x v15\n", pcm.select_channel, ix, pcm.write_latch);
+            }
         }
     }
 }
@@ -198,13 +245,14 @@ void PCM_Write(uint32_t address, uint8_t data)
 uint8_t PCM_Read(uint32_t address)
 {
     address &= 0x3f;
-    //printf("PCM Read: %.2x\n", address);
+    // printf("PCM Read: %.2x\n", address);
 
     if (address < 0x4)
     {
         if (pcm.voice_mask_updating)
             pcm.voice_mask = pcm.voice_mask_pending;
         pcm.voice_mask_updating = 0;
+        // printf("PCM read voice enable\n");
     }
     else if (address == 0x3c || address == 0x3e) // status
     {
@@ -222,10 +270,13 @@ uint8_t PCM_Read(uint32_t address)
         if (pcm.voice_mask_updating)
             status |= 32;
 
+        // printf("PCM read voice enable %02x\n", status);
+
         return status;
     }
     else if (address == 0x3f)
     {
+        // printf("PCM read wave rom read %02x\n", pcm.wave_byte_latch);
         return pcm.wave_byte_latch;
     }
     else if ((address >= 0x4 && address < 0x10) || (address >= 0x24 && address < 0x30))
@@ -241,6 +292,20 @@ uint8_t PCM_Read(uint32_t address)
                 ix |= 2;
 
             pcm.read_latch = pcm.ram1[pcm.select_channel][ix];
+            // if (pcm.select_channel >= 0x1d)
+            //     printf("PCM read ram1 %02x %02x %08x\n", pcm.select_channel, ix, pcm.read_latch);
+
+            switch (ix)
+            {
+                // case 0: printf("PCM read ram1 %02x %02x %08x addressEnd\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 1: printf("PCM read ram1 %02x %02x %08x filterTempHPF\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 2: printf("PCM read ram1 %02x %02x %08x addressLoop\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 3: printf("PCM read ram1 %02x %02x %08x filterTempLPF\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 4: printf("PCM read ram1 %02x %02x %08x address\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 5: printf("PCM read ram1 %02x %02x %08x tempReference\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 6: printf("PCM read ram1 %02x %02x %08x v6\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 7: printf("PCM read ram1 %02x %02x %08x v7\n", pcm.select_channel, ix, pcm.read_latch);
+            }
         }
     }
     else if ((address >= 0x10 && address < 0x20) || (address >= 0x30 && address < 0x38))
@@ -252,6 +317,28 @@ uint8_t PCM_Read(uint32_t address)
                 ix |= 8;
 
             pcm.read_latch = pcm.ram2[pcm.select_channel][ix];
+            // if (pcm.select_channel >= 0x1d)
+            //     printf("PCM read ram2 %02x %02x %04x\n", pcm.select_channel, ix, pcm.read_latch);
+
+            switch (ix)
+            {
+                // case 0: printf("PCM read ram2 %02x %02x %04x pitch\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 1: printf("PCM read ram2 %02x %02x %04x pan\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 2: printf("PCM read ram2 %02x %02x %04x revChorSend\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 3: printf("PCM read ram2 %02x %02x %04x volume1\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 4: printf("PCM read ram2 %02x %02x %04x volume2\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 5: printf("PCM read ram2 %02x %02x %04x cutoff\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 6: printf("PCM read ram2 %02x %02x %04x resonanceFlags\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 7: printf("PCM read ram2 %02x %02x %04x addrLoopFlags\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 8: printf("PCM read ram2 %02x %02x %04x subPhaseState\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 9: printf("PCM read ram2 %02x %02x %04x volume1TV\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 10: printf("PCM read ram2 %02x %02x %04x volume2TV\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 11: printf("PCM read ram2 %02x %02x %04x cutoffTV\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 12: printf("PCM read ram2 %02x %02x %04x v12\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 13: printf("PCM read ram2 %02x %02x %04x v13\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 14: printf("PCM read ram2 %02x %02x %04x v14\n", pcm.select_channel, ix, pcm.read_latch);
+                // case 15: printf("PCM read ram2 %02x %02x %04x v15\n", pcm.select_channel, ix, pcm.read_latch);
+            }
         }
     }
     else if (address >= 0x39 && address <= 0x3b)
@@ -259,10 +346,13 @@ uint8_t PCM_Read(uint32_t address)
         switch (address & 3)
         {
             case 1:
+                // printf("PCM read latch 1 %06x\n", pcm.read_latch);
                 return (pcm.read_latch >> 16) & 0xf;
             case 2:
+                // printf("PCM read latch 2 %06x\n", pcm.read_latch);
                 return (pcm.read_latch >> 8) & 0xff;
             case 3:
+                // printf("PCM read latch 3 %06x\n", pcm.read_latch);
                 return (pcm.read_latch >> 0) & 0xff;
         }
     }

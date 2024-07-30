@@ -9,7 +9,7 @@ include(CheckFunctionExists)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Prefer C++11 standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 
 if(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -192,6 +192,7 @@ set(SC55_SRC
     src/midi.h
     src/pcm.cpp src/pcm.h
     src/submcu.cpp src/submcu.h
+    src/jv880.cpp src/jv880.h
 
     src/utils/files.cpp src/utils/files.h
 )

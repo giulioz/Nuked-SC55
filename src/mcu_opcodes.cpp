@@ -516,9 +516,9 @@ uint32_t MCU_Operand_Read(void)
             {
                 MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
             }
-            return MCU_Read16(MCU_GetAddress(operand_ep, operand_ea));
+            return MCU_Read16(MCU_GetAddress(operand_ep, operand_ea), true);
         }
-        return MCU_Read(MCU_GetAddress(operand_ep, operand_ea));
+        return MCU_Read(MCU_GetAddress(operand_ep, operand_ea), true);
     case GENERAL_IMMEDIATE:
         return operand_data;
     }
@@ -739,14 +739,14 @@ void MCU_Opcode_Short_MOVF(uint8_t opcode)
         uint16_t data;
         if (siz)
         {
-            data = MCU_Read16(addr);
+            data = MCU_Read16(addr, true);
             mcu.r[reg] &= ~0xff;
             mcu.r[reg] |= data;
             MCU_SetStatusCommon(data, 0);
         }
         else
         {
-            data = MCU_Read(addr);
+            data = MCU_Read(addr, true);
             mcu.r[reg] = data;
             MCU_SetStatusCommon(data, 1);
         }
@@ -780,13 +780,13 @@ void MCU_Opcode_Short_MOVL(uint8_t opcode)
     {
         if (addr & 1)
             MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
-        data = MCU_Read16(addr);
+        data = MCU_Read16(addr, true);
         mcu.r[reg] = data;
         MCU_SetStatusCommon(data, 1);
     }
     else
     {
-        data = MCU_Read(addr);
+        data = MCU_Read(addr, true);
         mcu.r[reg] &= ~0xff;
         mcu.r[reg] |= data;
         MCU_SetStatusCommon(data, 0);

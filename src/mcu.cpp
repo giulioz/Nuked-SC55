@@ -45,11 +45,23 @@
 #include "midi.h"
 #include "utf8main.h"
 #include "utils/files.h"
+#include "jv880.h"
 
 #if __linux__
 #include <unistd.h>
 #include <limits.h>
 #endif
+
+// REVERSE STUFF
+bool recomp_is_code_addr[0x50000] = {0};
+uint32_t recomp_inst_count[0x50000] = {0};
+bool recomp_is_jmp_dest_addr[0x50000] = {0};
+bool recomp_is_call_dest_addr[0x50000] = {0};
+bool recomp_is_interrupt_dest_addr[0x50000] = {0};
+std::string recomp_code_conv_c[0x50000];
+uint32_t recomp_code_ptr = 0;
+
+JV880_Emu jv880_emu;
 
 const char* rs_name[ROM_SET_COUNT] = {
     "SC-55mk2",
@@ -559,8 +571,9 @@ uint8_t cardram[CARDRAM_SIZE];
 
 int rom2_mask = ROM2_SIZE - 1;
 
-uint8_t MCU_Read(uint32_t address)
+uint8_t MCU_Read(uint32_t address, bool data)
 {
+    uint32_t address_full = address;
     uint32_t address_rom = address & 0x3ffff;
     if (address & 0x80000 && !mcu_jv880)
         address_rom |= 0x40000;
@@ -571,7 +584,10 @@ uint8_t MCU_Read(uint32_t address)
     {
     case 0:
         if (!(address & 0x8000))
+        {
             ret = rom1[address & 0x7fff];
+            // if (data) printf("data read %x\n", address_full);
+        }
         else
         {
             if (!mcu_mk1)
@@ -580,6 +596,7 @@ uint8_t MCU_Read(uint32_t address)
                 if (address >= base && address < (base | 0x400))
                 {
                     ret = PCM_Read(address & 0x3f);
+                    // printf("PCM read %02x %02x\n", address & 0x3f, ret);
                 }
                 else if (!mcu_scb55 && address >= 0xec00 && address < 0xf000)
                 {
@@ -595,6 +612,7 @@ uint8_t MCU_Read(uint32_t address)
                 else if (address >= 0x8000 && address < 0xe000)
                 {
                     ret = sram[address & 0x7fff];
+                    // printf("%02x%04x: SRAM read %04x %02x\n", mcu.cp, mcu.pc, address, ret);
                 }
                 else if (address == (base | 0x402))
                 {
@@ -685,15 +703,19 @@ uint8_t MCU_Read(uint32_t address)
 #endif
     case 1:
         ret = rom2[address_rom & rom2_mask];
+        // if (data) printf("data read %x\n", address_full);
         break;
     case 2:
         ret = rom2[address_rom & rom2_mask];
+        // if (data) printf("data read %x\n", address_full);
         break;
     case 3:
         ret = rom2[address_rom & rom2_mask];
+        // if (data) printf("data read %x\n", address_full);
         break;
     case 4:
         ret = rom2[address_rom & rom2_mask];
+        // if (data) printf("data read %x\n", address_full);
         break;
     case 8:
         if (!mcu_jv880)
@@ -741,23 +763,23 @@ uint8_t MCU_Read(uint32_t address)
     return ret;
 }
 
-uint16_t MCU_Read16(uint32_t address)
+uint16_t MCU_Read16(uint32_t address, bool data)
 {
     address &= ~1;
     uint8_t b0, b1;
-    b0 = MCU_Read(address);
-    b1 = MCU_Read(address+1);
+    b0 = MCU_Read(address, data);
+    b1 = MCU_Read(address+1, data);
     return (b0 << 8) + b1;
 }
 
-uint32_t MCU_Read32(uint32_t address)
+uint32_t MCU_Read32(uint32_t address, bool data)
 {
     address &= ~3;
     uint8_t b0, b1, b2, b3;
-    b0 = MCU_Read(address);
-    b1 = MCU_Read(address+1);
-    b2 = MCU_Read(address+2);
-    b3 = MCU_Read(address+3);
+    b0 = MCU_Read(address, data);
+    b1 = MCU_Read(address+1, data);
+    b2 = MCU_Read(address+2, data);
+    b3 = MCU_Read(address+3, data);
     return (b0 << 24) + (b1 << 16) + (b2 << 8) + b3;
 }
 
@@ -799,6 +821,7 @@ void MCU_Write(uint32_t address, uint8_t value)
                 else if (address >= (base | 0x000) && address < (base | 0x400))
                 {
                     PCM_Write(address & 0x3f, value);
+                    // printf("%02x%04x: PCM write %02x %02x (voice %02x)\n", mcu.cp, mcu.pc, address & 0x3f, value, pcm.select_channel);
                 }
                 else if (!mcu_scb55 && address >= 0xec00 && address < 0xf000)
                 {
@@ -816,6 +839,7 @@ void MCU_Write(uint32_t address, uint8_t value)
                 else if (address >= 0x8000 && address < 0xe000)
                 {
                     sram[address & 0x7fff] = value;
+                    // printf("%02x%04x: SRAM write %04x %02x\n", mcu.cp, mcu.pc, address, value);
                 }
                 else
                 {
@@ -906,6 +930,11 @@ void MCU_Write16(uint32_t address, uint16_t value)
 
 void MCU_ReadInstruction(void)
 {
+    // recomp_code_ptr = MCU_GetAddress(mcu.cp, mcu.pc);
+    // recomp_inst_count[recomp_code_ptr]++;
+
+    // recomp_push_code("", true);
+
     uint8_t operand = MCU_ReadCodeAdvance();
 
     MCU_Operand_Table[operand](operand);
@@ -960,6 +989,9 @@ void MCU_PostUART(uint8_t data)
 {
     uart_buffer[uart_write_ptr] = data;
     uart_write_ptr = (uart_write_ptr + 1) % uart_buffer_size;
+
+    jv880_emu.midiRx(data);
+    // printf("midi rx: %02x\n", data);
 }
 
 void MCU_UpdateUART_RX(void)
@@ -1017,6 +1049,8 @@ int SDLCALL work_thread(void* data)
 {
     work_thread_lock = SDL_CreateMutex();
 
+    jv880_emu.init(rom2);
+
     MCU_WorkThread_Lock();
     while (work_thread_run)
     {
@@ -1034,47 +1068,70 @@ int SDLCALL work_thread(void* data)
             MCU_WorkThread_Lock();
         }
 
-        if (!mcu.ex_ignore)
-            MCU_Interrupt_Handle();
-        else
-            mcu.ex_ignore = 0;
-
-        if (!mcu.sleep)
-            MCU_ReadInstruction();
-
-        mcu.cycles += 12; // FIXME: assume 12 cycles per instruction
-
-        // if (mcu.cycles % 24000000 == 0)
-        //     printf("seconds: %i\n", (int)(mcu.cycles / 24000000));
-
-        PCM_Update(mcu.cycles);
-
-        TIMER_Clock(mcu.cycles);
-
-        if (!mcu_mk1 && !mcu_jv880 && !mcu_scb55)
-            SM_Update(mcu.cycles);
-        else
+        // Emulation mode
+        if (true)
+        // if (false)
         {
-            MCU_UpdateUART_RX();
-            MCU_UpdateUART_TX();
-        }
+            if (!mcu.ex_ignore)
+                MCU_Interrupt_Handle();
+            else
+                mcu.ex_ignore = 0;
 
-        MCU_UpdateAnalog(mcu.cycles);
+            if (mcu.cp == 0x00 && mcu.pc == 0x393f)
+                mcu.cp += 0;
+            if (mcu.cp == 0x00 && mcu.pc == 0x3b4c)
+                mcu.cp += 0;
 
-        if (mcu_mk1)
-        {
-            if (ga_lcd_counter)
+            // printf("%02x%04x pc\n", mcu.cp, mcu.pc);
+
+            if (!mcu.sleep)
+                MCU_ReadInstruction();
+
+            mcu.cycles += 12; // FIXME: assume 12 cycles per instruction
+
+            // if (mcu.cycles % 24000000 == 0)
+            //     printf("seconds: %i\n", (int)(mcu.cycles / 24000000));
+
+            PCM_Update(mcu.cycles);
+
+            TIMER_Clock(mcu.cycles);
+
+            if (!mcu_mk1 && !mcu_jv880 && !mcu_scb55)
+                SM_Update(mcu.cycles);
+            else
             {
-                ga_lcd_counter--;
-                if (ga_lcd_counter == 0)
+                MCU_UpdateUART_RX();
+                MCU_UpdateUART_TX();
+            }
+
+            MCU_UpdateAnalog(mcu.cycles);
+
+            if (mcu_mk1)
+            {
+                if (ga_lcd_counter)
                 {
-                    MCU_GA_SetGAInt(1, 0);
-                    MCU_GA_SetGAInt(1, 1);
+                    ga_lcd_counter--;
+                    if (ga_lcd_counter == 0)
+                    {
+                        MCU_GA_SetGAInt(1, 0);
+                        MCU_GA_SetGAInt(1, 1);
+                    }
                 }
             }
+
+            MIDI_Update();
         }
 
-        MIDI_Update();
+        // Remake mode
+        else
+        {
+            jv880_emu.update(mcu.cycles);
+
+            mcu.cycles += 12;
+            PCM_Update(mcu.cycles);
+
+            MIDI_Update();
+        }
     }
     MCU_WorkThread_Unlock();
 
@@ -1368,6 +1425,12 @@ void MIDI_Reset(ResetType resetType)
 
 int main(int argc, char *argv[])
 {
+    for (size_t i = 0; i < 0x50000; i++)
+    {
+        recomp_code_conv_c[i] = "";
+    }
+    
+
     (void)argc;
     std::string basePath;
 
@@ -1765,13 +1828,51 @@ int main(int argc, char *argv[])
     PCM_Reset();
 
     if (resetType != ResetType::NONE) MIDI_Reset(resetType);
+
+    FILE *f = fopen("nvram.bin", "rb");
+    fread(nvram, 1, 0x8000, f);
+    fclose(f);
     
     MCU_Run();
+
+    f = fopen("nvram.bin", "wb");
+    fwrite(nvram, 1, 0x8000, f);
+    fclose(f);
 
     MCU_CloseAudio();
     MIDI_Quit();
     LCD_UnInit();
     SDL_Quit();
+
+    // FILE *f_pr = fopen("program.bin", "wb");
+    // for (size_t i = 0; i < 0x50000; i++)
+    // {
+    //     if (recomp_is_code_addr[i])
+    //         fputc(rom1[i], f_pr);
+    //     else
+    //         fputc(0, f_pr);
+    // }
+    // fclose(f_pr);
+
+    // FILE *f_str = fopen("program.txt", "w");
+    // for (size_t i = 0; i < 0x50000; i++)
+    // {
+    //     if (recomp_code_conv_c[i] != "")
+    //     {
+    //         if (recomp_is_jmp_dest_addr[i])
+    //             fprintf(f_str, "addr_%06x:\n", i);
+    //         if (recomp_is_call_dest_addr[i])
+    //             fprintf(f_str, "addr_fn_%06x:\n", i);
+    //         if (recomp_is_interrupt_dest_addr[i])
+    //             fprintf(f_str, "addr_int_%06x:\n", i);
+
+    //         fprintf(f_str, "%s", recomp_code_conv_c[i].c_str());
+            
+    //         // fprintf(f_str, " // count: %d\n", recomp_inst_count[i]);
+    //         fprintf(f_str, "\n");
+    //     }
+    // }
+    // fclose(f_str);
 
     return 0;
 }
