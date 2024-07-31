@@ -4,19 +4,12 @@
     <Version>1.0</Version>
     <FlowState>
         <Process ID="Synthesis" State="2"/>
-        <Process ID="Pnr" State="2"/>
+        <Process ID="Pnr" State="3"/>
         <Process ID="Gao" State="2"/>
         <Process ID="Rtl_Gao" State="2"/>
     </FlowState>
     <ResultFileList>
         <ResultFile ResultFileType="RES.netlist" ResultFilePath="impl/gwsynthesis/gp_fpga.vg"/>
-        <ResultFile ResultFileType="RES.pnr.bitstream" ResultFilePath="impl/pnr/gp_fpga.fs"/>
-        <ResultFile ResultFileType="RES.pnr.pin.rpt" ResultFilePath="impl/pnr/gp_fpga.pin.html"/>
-        <ResultFile ResultFileType="RES.pnr.posp.bin" ResultFilePath="impl/pnr/gp_fpga.db"/>
-        <ResultFile ResultFileType="RES.pnr.pwr.rpt" ResultFilePath="impl/pnr/gp_fpga.power.html"/>
-        <ResultFile ResultFileType="RES.pnr.report" ResultFilePath="impl/pnr/gp_fpga.rpt.html"/>
-        <ResultFile ResultFileType="RES.pnr.timing.paths" ResultFilePath="impl/pnr/gp_fpga.timing_paths"/>
-        <ResultFile ResultFileType="RES.pnr.timing.rpt" ResultFilePath="impl/pnr/gp_fpga.tr.html"/>
         <ResultFile ResultFileType="RES.syn.report" ResultFilePath="impl/gwsynthesis/gp_fpga_syn.rpt.html"/>
         <ResultFile ResultFileType="RES.syn.resource" ResultFilePath="impl/gwsynthesis/gp_fpga_syn_rsc.xml"/>
     </ResultFileList>

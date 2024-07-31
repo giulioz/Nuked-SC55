@@ -1,0 +1,12 @@
+-d Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\impl\gwsynthesis\gp_fpga.vg
+-p GW2AR-18C-QFN88-8
+-pn GW2AR-LV18QN88C8/I7
+-cst Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst
+-cfg Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\impl\pnr\device.cfg
+-bit
+-tr
+-ph
+-timing
+-cst_error
+-correct_hold 1
+-route_maxfan 23

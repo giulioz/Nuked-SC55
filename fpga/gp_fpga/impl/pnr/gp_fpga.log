@@ -1,0 +1,11 @@
+Reading netlist file: "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\impl\gwsynthesis\gp_fpga.vg"
+Parsing netlist file "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\impl\gwsynthesis\gp_fpga.vg" completed
+Processing netlist completed
+Reading constraint file: "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst"
+ERROR  (CT1108) : "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst":24 | Illegal port attribute value specified 'DRIVE = 8' on 'data_bus[2]'
+ERROR  (CT1108) : "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst":26 | Illegal port attribute value specified 'DRIVE = 8' on 'data_bus[3]'
+ERROR  (CT1108) : "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst":28 | Illegal port attribute value specified 'DRIVE = 8' on 'data_bus[4]'
+ERROR  (CT1108) : "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst":30 | Illegal port attribute value specified 'DRIVE = 8' on 'data_bus[5]'
+ERROR  (CT1108) : "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst":32 | Illegal port attribute value specified 'DRIVE = 8' on 'data_bus[6]'
+ERROR  (CT1108) : "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\constr.cst":34 | Illegal port attribute value specified 'DRIVE = 8' on 'data_bus[7]'
+Physical Constraint parsed completed with errors

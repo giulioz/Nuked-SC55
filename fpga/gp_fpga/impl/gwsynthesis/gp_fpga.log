@@ -1,0 +1,48 @@
+GowinSynthesis start
+Running parser ...
+Analyzing Verilog file 'Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v'
+WARN  (EX3792) : Literal value 'h70 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":244)
+WARN  (EX3792) : Literal value 'h71 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":245)
+WARN  (EX3792) : Literal value 'h72 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":246)
+WARN  (EX3792) : Literal value 'h73 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":247)
+WARN  (EX3792) : Literal value 'h80 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":274)
+WARN  (EX3792) : Literal value 'h81 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":275)
+WARN  (EX3792) : Literal value 'h82 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":276)
+WARN  (EX3792) : Literal value 'h83 truncated to fit in 6 bits("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":277)
+Compiling module 'pcm'("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":1)
+WARN  (EX3791) : Expression size 9 truncated to fit in target size 8("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":311)
+WARN  (EX3791) : Expression size 11 truncated to fit in target size 8("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":312)
+WARN  (EX3791) : Expression size 9 truncated to fit in target size 8("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":324)
+WARN  (EX3791) : Expression size 13 truncated to fit in target size 8("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":332)
+WARN  (EX3791) : Expression size 16 truncated to fit in target size 1("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":335)
+WARN  (EX3791) : Expression size 32 truncated to fit in target size 16("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":348)
+WARN  (EX3791) : Expression size 32 truncated to fit in target size 16("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":349)
+WARN  (EX3791) : Expression size 32 truncated to fit in target size 16("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":375)
+WARN  (EX3791) : Expression size 32 truncated to fit in target size 16("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":376)
+WARN  (EX1998) : Net 'interp_lut_addr[6]' does not have a driver("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":51)
+WARN  (EX1998) : Net 'main_sm.orval[7]' does not have a driver("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":216)
+NOTE  (EX0101) : Current top module is "pcm"
+WARN  (EX0211) : The output port "uart_tx" of module "pcm" has no driver, assigning undriven bits to Z, simulation mismatch possible("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":4)
+WARN  (EX0211) : The output port "gpint" of module "pcm" has no driver, assigning undriven bits to Z, simulation mismatch possible("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":12)
+WARN  (EX0211) : The output port "wait_bus" of module "pcm" has no driver, assigning undriven bits to Z, simulation mismatch possible("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":13)
+[5%] Running netlist conversion ...
+WARN  (CV0016) : Input uart_rx is unused("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":5)
+WARN  (CV0016) : Input cs_bus is unused("Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\src\pcm.v":11)
+Running device independent optimization ...
+[10%] Optimizing Phase 0 completed
+[15%] Optimizing Phase 1 completed
+[25%] Optimizing Phase 2 completed
+Running inference ...
+[30%] Inferring Phase 0 completed
+[40%] Inferring Phase 1 completed
+[50%] Inferring Phase 2 completed
+[55%] Inferring Phase 3 completed
+Running technical mapping ...
+[60%] Tech-Mapping Phase 0 completed
+[65%] Tech-Mapping Phase 1 completed
+[75%] Tech-Mapping Phase 2 completed
+[80%] Tech-Mapping Phase 3 completed
+[90%] Tech-Mapping Phase 4 completed
+[95%] Generate netlist file "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\impl\gwsynthesis\gp_fpga.vg" completed
+[100%] Generate report file "Z:\Users\giuliozausa\personal\programming\Nuked-SC55\fpga\gp_fpga\impl\gwsynthesis\gp_fpga_syn.rpt.html" completed
+GowinSynthesis finish
