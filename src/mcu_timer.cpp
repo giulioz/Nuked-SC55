@@ -36,8 +36,6 @@
 #include "mcu.h"
 #include "mcu_timer.h"
 
-uint64_t timer_cycles;
-uint64_t timer_lastcycles;
 uint8_t timer_tempreg;
 
 bool timer8_enabled;
@@ -65,7 +63,6 @@ bool timer2_ociea;
 
 void TIMER_Reset(void)
 {
-    timer_cycles = 0;
     timer_tempreg = 0;
 
     timer8_enabled = false;
