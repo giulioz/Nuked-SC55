@@ -37,122 +37,132 @@
 #include "mcu_timer.h"
 
 uint64_t timer_cycles;
+uint64_t timer_lastcycles;
 uint8_t timer_tempreg;
 
-frt_t frt[3];
-mcu_timer_t timer;
+bool timer8_enabled;
+bool timer8_cmiea;
+bool timer8_cmfa;
+bool timer8_cmfa_read;
+uint8_t timer8_tcora;
+uint8_t timer8_tcnt;
 
-enum {
-    REG_TCR = 0x00,
-    REG_TCSR = 0x01,
-    REG_FRCH = 0x02,
-    REG_FRCL = 0x03,
-    REG_OCRAH = 0x04,
-    REG_OCRAL = 0x05,
-    REG_OCRBH = 0x06,
-    REG_OCRBL = 0x07,
-    REG_ICRH = 0x08,
-    REG_ICRL = 0x09,
-};
+uint16_t timer0_ocra;
+uint16_t timer1_ocra;
+uint16_t timer2_ocra;
+uint16_t timer0_frc;
+uint16_t timer1_frc;
+uint16_t timer2_frc;
+bool timer0_ocfa;
+bool timer1_ocfa;
+bool timer2_ocfa;
+bool timer0_ocfa_read;
+bool timer1_ocfa_read;
+bool timer2_ocfa_read;
+bool timer0_ociea;
+bool timer1_ociea;
+bool timer2_ociea;
 
 void TIMER_Reset(void)
 {
     timer_cycles = 0;
     timer_tempreg = 0;
-    memset(frt, 0, sizeof(frt));
-    memset(&timer, 0, sizeof(timer));
+
+    timer8_enabled = false;
+    timer8_cmiea = false;
+    timer8_cmfa = false;
+    timer8_cmfa_read = false;
+    timer8_tcora = 0;
+    timer8_tcnt = 0;
+
+    timer0_ocra = 0;
+    timer1_ocra = 0;
+    timer2_ocra = 0;
+    timer0_frc = 0;
+    timer1_frc = 0;
+    timer2_frc = 0;
+    timer0_ocfa = false;
+    timer1_ocfa = false;
+    timer2_ocfa = false;
+    timer0_ocfa_read = false;
+    timer1_ocfa_read = false;
+    timer2_ocfa_read = false;
+    timer0_ociea = false;
+    timer1_ociea = false;
+    timer2_ociea = false;
 }
 
 void TIMER_Write(uint32_t address, uint8_t data)
 {
-    uint32_t t = (address >> 4) - 1;
-    if (t > 2)
-        return;
-    address &= 0x0f;
-    frt_t *timer = &frt[t];
     switch (address)
     {
-    case REG_TCR:
-        timer->tcr = data;
+    case DEV_FRT1_TCR:
+        timer0_ociea = data == 0b00100000;
         break;
-    case REG_TCSR:
-        timer->tcsr &= ~0xf;
-        timer->tcsr |= data & 0xf;
-        if ((data & 0x10) == 0 && (timer->status_rd & 0x10) != 0)
+    case DEV_FRT2_TCR:
+        timer1_ociea = data == 0b00100000;
+        break;
+    case DEV_FRT3_TCR:
+        timer2_ociea = data == 0b00100000;
+        break;
+    case DEV_FRT1_TCSR:
+        if ((data & 0x20) == 0 && timer0_ocfa_read)
         {
-            timer->tcsr &= ~0x10;
-            timer->status_rd &= ~0x10;
-            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_FOVI + t * 4, 0);
-        }
-        if ((data & 0x20) == 0 && (timer->status_rd & 0x20) != 0)
-        {
-            timer->tcsr &= ~0x20;
-            timer->status_rd &= ~0x20;
-            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_OCIA + t * 4, 0);
-        }
-        if ((data & 0x40) == 0 && (timer->status_rd & 0x40) != 0)
-        {
-            timer->tcsr &= ~0x40;
-            timer->status_rd &= ~0x40;
-            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_OCIB + t * 4, 0);
+            timer0_ocfa = false;
+            timer0_ocfa_read = false;
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_OCIA, 0);
         }
         break;
-    case REG_FRCH:
-    case REG_OCRAH:
-    case REG_OCRBH:
-    case REG_ICRH:
+    case DEV_FRT2_TCSR:
+        if ((data & 0x20) == 0 && timer1_ocfa_read)
+        {
+            timer1_ocfa = false;
+            timer1_ocfa_read = false;
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT1_OCIA, 0);
+        }
+        break;
+    case DEV_FRT3_TCSR:
+        if ((data & 0x20) == 0 && timer2_ocfa_read)
+        {
+            timer2_ocfa = false;
+            timer2_ocfa_read = false;
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT2_OCIA, 0);
+        }
+        break;
+    case DEV_FRT1_OCRAH:
+    case DEV_FRT2_OCRAH:
+    case DEV_FRT3_OCRAH:
         timer_tempreg = data;
         break;
-    case REG_FRCL:
-        timer->frc = (timer_tempreg << 8) | data;
+    case DEV_FRT1_OCRAL:
+        timer0_ocra = (timer_tempreg << 8) | data;
         break;
-    case REG_OCRAL:
-        timer->ocra = (timer_tempreg << 8) | data;
+    case DEV_FRT2_OCRAL:
+        timer1_ocra = (timer_tempreg << 8) | data;
         break;
-    case REG_OCRBL:
-        timer->ocrb = (timer_tempreg << 8) | data;
-        break;
-    case REG_ICRL:
-        timer->icr = (timer_tempreg << 8) | data;
+    case DEV_FRT3_OCRAL:
+        timer2_ocra = (timer_tempreg << 8) | data;
         break;
     }
 }
 
 uint8_t TIMER_Read(uint32_t address)
 {
-    uint32_t t = (address >> 4) - 1;
-    if (t > 2)
-        return 0xff;
-    address &= 0x0f;
-    frt_t *timer = &frt[t];
+    uint8_t ret;
     switch (address)
     {
-    case REG_TCR:
-        return timer->tcr;
-    case REG_TCSR:
-    {
-        uint8_t ret = timer->tcsr;
-        timer->status_rd |= timer->tcsr & 0xf0;
-        //timer->status_rd |= 0xf0;
+    case DEV_FRT1_TCSR:
+        ret = 0b01110001;
+        timer0_ocfa_read |= timer0_ocfa;
         return ret;
-    }
-    case REG_FRCH:
-        timer_tempreg = timer->frc & 0xff;
-        return timer->frc >> 8;
-    case REG_OCRAH:
-        timer_tempreg = timer->ocra & 0xff;
-        return timer->ocra >> 8;
-    case REG_OCRBH:
-        timer_tempreg = timer->ocrb & 0xff;
-        return timer->ocrb >> 8;
-    case REG_ICRH:
-        timer_tempreg = timer->icr & 0xff;
-        return timer->icr >> 8;
-    case REG_FRCL:
-    case REG_OCRAL:
-    case REG_OCRBL:
-    case REG_ICRL:
-        return timer_tempreg;
+    case DEV_FRT2_TCSR:
+        ret = 0b01110001;
+        timer1_ocfa_read |= timer1_ocfa;
+        return ret;
+    case DEV_FRT3_TCSR:
+        ret = 0b01110001;
+        timer2_ocfa_read |= timer2_ocfa;
+        return ret;
     }
     return 0xff;
 }
@@ -162,191 +172,79 @@ void TIMER2_Write(uint32_t address, uint8_t data)
     switch (address)
     {
     case DEV_TMR_TCR:
-        timer.tcr = data;
+        timer8_enabled = data & 1;
+        timer8_cmiea = data >> 6;
         break;
     case DEV_TMR_TCSR:
-        timer.tcsr &= ~0xf;
-        timer.tcsr |= data & 0xf;
-        if ((data & 0x20) == 0 && (timer.status_rd & 0x20) != 0)
+        if ((data & 0x40) == 0 && timer8_cmfa)
         {
-            timer.tcsr &= ~0x20;
-            timer.status_rd &= ~0x20;
-            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_OVI, 0);
-        }
-        if ((data & 0x40) == 0 && (timer.status_rd & 0x40) != 0)
-        {
-            timer.tcsr &= ~0x40;
-            timer.status_rd &= ~0x40;
+            timer8_cmfa = false;
+            timer8_cmfa_read = false;
             MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_CMIA, 0);
-        }
-        if ((data & 0x80) == 0 && (timer.status_rd & 0x80) != 0)
-        {
-            timer.tcsr &= ~0x80;
-            timer.status_rd &= ~0x80;
-            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_CMIB, 0);
         }
         break;
     case DEV_TMR_TCORA:
-        timer.tcora = data;
-        break;
-    case DEV_TMR_TCORB:
-        timer.tcorb = data;
+        timer8_tcora = data;
         break;
     case DEV_TMR_TCNT:
-        timer.tcnt = data;
+        timer8_tcnt = data;
         break;
     }
 }
 uint8_t TIMER_Read2(uint32_t address)
 {
-    switch (address)
+    if (address == DEV_TMR_TCSR)
     {
-    case DEV_TMR_TCR:
-        return timer.tcr;
-    case DEV_TMR_TCSR:
-    {
-        uint8_t ret = timer.tcsr;
-        timer.status_rd |= timer.tcsr & 0xe0;
+        uint8_t ret = timer8_cmfa ? 0b11100000 : 0b10100000;
+        timer8_cmfa_read |= timer8_cmfa;
         return ret;
-    }
-    case DEV_TMR_TCORA:
-        return timer.tcora;
-    case DEV_TMR_TCORB:
-        return timer.tcorb;
-    case DEV_TMR_TCNT:
-        return timer.tcnt;
     }
     return 0xff;
 }
 
 void TIMER_Clock(uint64_t cycles)
 {
-    uint32_t i;
-    while (timer_cycles*2 < cycles) // FIXME
+    if (timer8_enabled && (cycles & 0x3f) == 0)
     {
-        for (i = 0; i < 3; i++)
-        {
-            frt_t *timer = &frt[i];
-            uint32_t offset = 0x10 * i;
+        timer8_cmfa = true;
+        if (timer8_cmiea)
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_CMIA, 1);
+    }
 
-            switch (timer->tcr & 3)
-            {
-            case 0: // o / 4
-                if (timer_cycles & 3)
-                    continue;
-                break;
-            case 1: // o / 8
-                if (timer_cycles & 7)
-                    continue;
-                break;
-            case 2: // o / 32
-                if (timer_cycles & 31)
-                    continue;
-                break;
-            case 3: // ext (o / 2)
-                if (mcu_mk1)
-                {
-                    if (timer_cycles & 3)
-                        continue;
-                }
-                else
-                {
-                    if (timer_cycles & 1)
-                        continue;
-                }
-                break;
-            }
+    {
+        bool matcha = (timer0_frc >> 2) >= timer0_ocra;
+        if (matcha)
+            timer0_frc = 0;
+        else
+            timer0_frc += 6;
 
-            uint32_t value = timer->frc;
-            uint32_t matcha = value == timer->ocra;
-            uint32_t matchb = value == timer->ocrb;
-            if ((timer->tcsr & 1) != 0 && matcha) // CCLRA
-                value = 0;
-            else
-                value++;
-            uint32_t of = (value >> 16) & 1;
-            value &= 0xffff;
-            timer->frc = value;
+        if (matcha)
+            timer0_ocfa |= 0x20;
+        if (timer0_ociea && matcha)
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_OCIA, 1);
+    }
+    {
+        bool matcha = (timer1_frc >> 2) >= timer1_ocra;
+        if (matcha)
+            timer1_frc = 0;
+        else
+            timer1_frc += 6;
 
-            // flags
-            if (of)
-                timer->tcsr |= 0x10;
-            if (matcha)
-                timer->tcsr |= 0x20;
-            if (matchb)
-                timer->tcsr |= 0x40;
-            if ((timer->tcr & 0x10) != 0 && (timer->tcsr & 0x10) != 0)
-                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_FOVI + i * 4, 1);
-            if ((timer->tcr & 0x20) != 0 && (timer->tcsr & 0x20) != 0)
-                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_OCIA + i * 4, 1);
-            if ((timer->tcr & 0x40) != 0 && (timer->tcsr & 0x40) != 0)
-                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT0_OCIB + i * 4, 1);
-        }
+        if (matcha)
+            timer1_ocfa |= 0x20;
+        if (timer1_ociea && matcha)
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT1_OCIA, 1);
+    }
+    {
+        bool matcha = (timer2_frc >> 2) >= timer2_ocra;
+        if (matcha)
+            timer2_frc = 0;
+        else
+            timer2_frc += 6;
 
-        int32_t timer_step = 0;
-
-        switch (timer.tcr & 7)
-        {
-        case 0:
-        case 4:
-            break;
-        case 1: // o / 8
-            if ((timer_cycles & 7) == 0)
-                timer_step = 1;
-            break;
-        case 2: // o / 64
-            if ((timer_cycles & 63) == 0)
-                timer_step = 1;
-            break;
-        case 3: // o / 1024
-            if ((timer_cycles & 1023) == 0)
-                timer_step = 1;
-            break;
-        case 5:
-        case 6:
-        case 7: // ext (o / 2)
-            if (mcu_mk1)
-            {
-                if ((timer_cycles & 3) == 0)
-                    timer_step = 1;
-            }
-            else
-            {
-                if ((timer_cycles & 1) == 0)
-                    timer_step = 1;
-            }
-            break;
-        }
-        if (timer_step)
-        {
-            uint32_t value = timer.tcnt;
-            uint32_t matcha = value == timer.tcora;
-            uint32_t matchb = value == timer.tcorb;
-            if ((timer.tcr & 24) == 8 && matcha)
-                value = 0;
-            else if ((timer.tcr & 24) == 16 && matchb)
-                value = 0;
-            else
-                value++;
-            uint32_t of = (value >> 8) & 1;
-            value &= 0xff;
-            timer.tcnt = value;
-
-            // flags
-            if (of)
-                timer.tcsr |= 0x20;
-            if (matcha)
-                timer.tcsr |= 0x40;
-            if (matchb)
-                timer.tcsr |= 0x80;
-            if ((timer.tcr & 0x20) != 0 && (timer.tcsr & 0x20) != 0)
-                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_OVI, 1);
-            if ((timer.tcr & 0x40) != 0 && (timer.tcsr & 0x40) != 0)
-                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_CMIA, 1);
-            if ((timer.tcr & 0x80) != 0 && (timer.tcsr & 0x80) != 0)
-                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_TIMER_CMIB, 1);
-        }
-
-        timer_cycles++;
+        if (matcha)
+            timer2_ocfa |= 0x20;
+        if (timer2_ociea && matcha)
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_FRT2_OCIA, 1);
     }
 }
