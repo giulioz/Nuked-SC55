@@ -310,7 +310,7 @@ void TIMER_Clock(uint64_t cycles)
         case 5:
         case 6:
         case 7: // ext (o / 2)
-            if (mcu_mk1 || mcu_sc88)
+            if (mcu_mk1)
             {
                 if ((timer_cycles & 3) == 0)
                     timer_step = 1;

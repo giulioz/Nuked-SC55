@@ -268,6 +268,50 @@ const int button_map_rd500[][2] =
     // TODO
 };
 
+const int button_map_ra30[][2] =
+{
+    SDL_SCANCODE_A, MCU_RA30_BALANCE_ARRANGER,
+    SDL_SCANCODE_B, MCU_RA30_BALANCE_TONE,
+    SDL_SCANCODE_C, MCU_RA30_TEMPO_MINUS,
+    SDL_SCANCODE_D, MCU_RA30_TEMPO_PLUS,
+    SDL_SCANCODE_E, MCU_RA30_FN_TUNE,
+    SDL_SCANCODE_F, MCU_RA30_FN_DEMO,
+    SDL_SCANCODE_G, MCU_RA30_REC_REC,
+    SDL_SCANCODE_H, MCU_RA30_REC_PLAY,
+    SDL_SCANCODE_I, MCU_RA30_TONE_KEYBOARD,
+    SDL_SCANCODE_J, MCU_RA30_NONE_0,
+    SDL_SCANCODE_K, MCU_RA30_FILLIN_VARIATION,
+    SDL_SCANCODE_L, MCU_RA30_FILLIN_ORIGINAL,
+    SDL_SCANCODE_M, MCU_RA30_INTRO_ENDING,
+    SDL_SCANCODE_N, MCU_RA30_START_STOP,
+    SDL_SCANCODE_O, MCU_RA30_ONETOUCH_KEYBOARD,
+    SDL_SCANCODE_P, MCU_RA30_ONETOUCH_ARRANGER,
+    SDL_SCANCODE_Q, MCU_RA30_STYLE_A,
+    SDL_SCANCODE_R, MCU_RA30_STYLE_B,
+    SDL_SCANCODE_S, MCU_RA30_STYLE_C,
+    SDL_SCANCODE_T, MCU_RA30_STYLE_D,
+    SDL_SCANCODE_U, MCU_RA30_STYLE_E,
+    SDL_SCANCODE_V, MCU_RA30_STYLE_F,
+    SDL_SCANCODE_W, MCU_RA30_STYLE_G,
+    SDL_SCANCODE_X, MCU_RA30_STYLE_H,
+    SDL_SCANCODE_Y, MCU_RA30_TONE_1,
+    SDL_SCANCODE_Z, MCU_RA30_TONE_2,
+    SDL_SCANCODE_0, MCU_RA30_TONE_3,
+    SDL_SCANCODE_1, MCU_RA30_TONE_4,
+    SDL_SCANCODE_2, MCU_RA30_TONE_5,
+    SDL_SCANCODE_3, MCU_RA30_TONE_6,
+    SDL_SCANCODE_4, MCU_RA30_TONE_7,
+    SDL_SCANCODE_5, MCU_RA30_TONE_8,
+    // SDL_SCANCODE_6, MCU_RA30_NONE_1,
+    // SDL_SCANCODE_7, MCU_RA30_NONE_2,
+    // SDL_SCANCODE_8, MCU_RA30_NONE_3,
+    // SDL_SCANCODE_9, MCU_RA30_NONE_4,
+    // SDL_SCANCODE_10, MCU_RA30_TONESELECT_U,
+    // SDL_SCANCODE_11, MCU_RA30_TONESELECT_L,
+    // SDL_SCANCODE_12, MCU_RA30_STYLESELECT_U,
+    // SDL_SCANCODE_13, MCU_RA30_STYLESELECT_L,
+};
+
 const int button_map_xp10[][2] =
 {
     SDL_SCANCODE_I, MCU_XP10_BUTTON_UTILITY,
@@ -537,7 +581,7 @@ void LCD_Update(void)
         }
         else
         {
-            if (mcu_jv880 || mcu_xp10 || mcu_rd500 || mcu_ra30)
+            if (mcu_jv880 || mcu_xp10 || mcu_rd500 || mcu_ra30 || mcu_se70)
             {
                 uint32_t back_color = 0xFF03be51;
                 for (size_t i = 0; i < lcd_height; i++) {
@@ -561,7 +605,7 @@ void LCD_Update(void)
                 LCD_RenderSegments(10 + 40 * 1, 10, LCD_7SEG[1]);
                 LCD_RenderSegments(10 + 40 * 2, 10, LCD_7SEG[2]);
             }
-            else if (mcu_jv880 || mcu_xp10)
+            else if (mcu_jv880 || mcu_xp10 || mcu_se70)
             {
                 int width = mcu_jv880 ? 24 : 16;
                 for (int i = 0; i < 2; i++)
@@ -686,12 +730,14 @@ void LCD_Update(void)
                     mcu_rd500 ? button_map_rd500 :
                     mcu_jv880 ? button_map_jv880 :
                     mcu_sc88 ? button_map_sc88 :
+                    mcu_ra30 ? button_map_ra30 :
                     button_map_sc55;
                 auto button_size = (
                     mcu_xp10 ? sizeof(button_map_xp10) :
                     mcu_rd500 ? sizeof(button_map_rd500) :
                     mcu_jv880 ? sizeof(button_map_jv880) :
                     mcu_sc88 ? sizeof(button_map_sc88) :
+                    mcu_ra30 ? sizeof(button_map_ra30) :
                     sizeof(button_map_sc55)
                 ) / sizeof(button_map_sc55[0]);
                 for (size_t i = 0; i < button_size; i++)

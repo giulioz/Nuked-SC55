@@ -50,7 +50,7 @@ int MIDI_Init(int port)
     int in_id = Pm_CreateVirtualInput("Virtual SC55", NULL, NULL);
 
     Pm_OpenInput(&midiInStream, in_id, NULL, 0, NULL, NULL);
-    Pm_SetFilter(midiInStream, PM_FILT_ACTIVE | PM_FILT_CLOCK);
+    Pm_SetFilter(midiInStream, PM_FILT_ACTIVE | PM_FILT_CLOCK | PM_FILT_SYSEX);
 
     // Empty the buffer, just in case anything got through
     PmEvent receiveBuffer[1];

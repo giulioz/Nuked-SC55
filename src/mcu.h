@@ -486,6 +486,48 @@ enum {
     MCU_XP10_BUTTON_SEQCTRL = 25,
     MCU_XP10_BUTTON_VARIATION = 26,
     MCU_XP10_BUTTON_ENTER = 27,
+
+    // RA30
+    MCU_RA30_BALANCE_ARRANGER = 0,
+    MCU_RA30_BALANCE_TONE = 1,
+    MCU_RA30_TEMPO_MINUS = 2,
+    MCU_RA30_TEMPO_PLUS = 3,
+    MCU_RA30_FN_TUNE = 4,
+    MCU_RA30_FN_DEMO = 5,
+    MCU_RA30_REC_REC = 6,
+    MCU_RA30_REC_PLAY = 7,
+    MCU_RA30_TONE_KEYBOARD = 8,
+    MCU_RA30_NONE_0 = 9,
+    MCU_RA30_FILLIN_VARIATION = 10,
+    MCU_RA30_FILLIN_ORIGINAL = 11,
+    MCU_RA30_INTRO_ENDING = 12,
+    MCU_RA30_START_STOP = 13,
+    MCU_RA30_ONETOUCH_KEYBOARD = 14,
+    MCU_RA30_ONETOUCH_ARRANGER = 15,
+    MCU_RA30_STYLE_A = 16,
+    MCU_RA30_STYLE_B = 17,
+    MCU_RA30_STYLE_C = 18,
+    MCU_RA30_STYLE_D = 19,
+    MCU_RA30_STYLE_E = 20,
+    MCU_RA30_STYLE_F = 21,
+    MCU_RA30_STYLE_G = 22,
+    MCU_RA30_STYLE_H = 23,
+    MCU_RA30_TONE_1 = 24,
+    MCU_RA30_TONE_2 = 25,
+    MCU_RA30_TONE_3 = 26,
+    MCU_RA30_TONE_4 = 27,
+    MCU_RA30_TONE_5 = 28,
+    MCU_RA30_TONE_6 = 29,
+    MCU_RA30_TONE_7 = 30,
+    MCU_RA30_TONE_8 = 31,
+    // MCU_RA30_NONE_1 = 32,
+    // MCU_RA30_NONE_2 = 33,
+    // MCU_RA30_NONE_3 = 34,
+    // MCU_RA30_NONE_4 = 35,
+    // MCU_RA30_TONESELECT_U = 36,
+    // MCU_RA30_TONESELECT_L = 37,
+    // MCU_RA30_STYLESELECT_U = 38,
+    // MCU_RA30_STYLESELECT_L = 39,
 };
 
 
@@ -504,6 +546,8 @@ enum {
     ROM_SET_SC88VL,
     ROM_SET_XP10,
     ROM_SET_RA30,
+    ROM_SET_SY99,
+    ROM_SET_SE70,
     ROM_SET_COUNT
 };
 
@@ -518,10 +562,12 @@ extern int mcu_jv880;
 extern int mcu_scb55;
 extern int mcu_sc155;
 extern int mcu_rd500;
+extern int mcu_ra30;
 extern int mcu_sc88;
 extern int mcu_sc88vl;
 extern int mcu_xp10;
-extern int mcu_ra30;
+extern int mcu_sy99;
+extern int mcu_se70;
 
 extern int mcu_h8_510;
 

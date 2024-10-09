@@ -61,18 +61,20 @@ uint8_t PCM_ReadROM(uint32_t address)
             else
                 return waverom1[address & 0x1fffff];
         case 1:
-            if (!mcu_jv880 && !mcu_rd500 && !mcu_xp10)
+            if (!mcu_jv880 && !mcu_rd500 && !mcu_xp10 && !mcu_sc88)
                 return waverom2[address & 0xfffff];
             else
                 return waverom2[address & 0x1fffff];
         case 2:
             if (mcu_jv880)
                 return waverom_card[address & 0x1fffff];
-            else if (mcu_rd500)
+            else if (mcu_rd500 || mcu_sc88)
                 return waverom3[address & 0x1fffff];
             else
                 return waverom3[address & 0xfffff];
         case 3:
+            if (mcu_sc88)
+                return waverom4[address & 0x1fffff];
         case 4:
         case 5:
         case 6:
@@ -193,6 +195,26 @@ void PCM_Write(uint32_t address, uint8_t data)
                 ix |= 8;
 
             pcm.ram2[pcm.select_channel][ix] = pcm.write_latch;
+
+            switch (ix)
+            {
+                // case 0: printf("PCM write ram2 %02x %02x %04x pitch\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 1: printf("PCM write ram2 %02x %02x %04x pan\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 2: printf("PCM write ram2 %02x %02x %04x revChorSend\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 3: printf("PCM write ram2 %02x %02x %04x volume1\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 4: printf("PCM write ram2 %02x %02x %04x volume2\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 5: printf("PCM write ram2 %02x %02x %04x cutoff\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 6: printf("PCM write ram2 %02x %02x %04x resonanceFlags\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 7: printf("PCM write ram2 %02x %02x %04x addrLoopFlags\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 8: printf("PCM write ram2 %02x %02x %04x subPhaseState\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 9: printf("PCM write ram2 %02x %02x %04x volume1TV\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 10: printf("PCM write ram2 %02x %02x %04x volume2TV\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 11: printf("PCM write ram2 %02x %02x %04x cutoffTV\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 12: printf("PCM write ram2 %02x %02x %04x v12\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 13: printf("PCM write ram2 %02x %02x %04x v13\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 14: printf("PCM write ram2 %02x %02x %04x v14\n", pcm.select_channel, ix, pcm.write_latch);
+                // case 15: printf("PCM write ram2 %02x %02x %04x v15\n", pcm.select_channel, ix, pcm.write_latch);
+            }
         }
     }
 }
@@ -534,6 +556,11 @@ void PCM_Update(uint64_t cycles)
 {
     int reg_slots = (pcm.config_reg_3d & 31) + 1;
     int voice_active = pcm.voice_mask & pcm.voice_mask_pending;
+    if (mcu_se70)
+    {
+        // MOCK for speed
+        reg_slots = 10;
+    }
     while (pcm.cycles < cycles)
     {
         int tt[2] = {};
