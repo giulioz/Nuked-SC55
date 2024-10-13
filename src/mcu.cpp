@@ -297,7 +297,7 @@ uint16_t MCU_AnalogReadPin(uint32_t pin)
 {
     if (mcu_cm300)
         return 0;
-    if (mcu_xp10 || mcu_ra30)
+    if (mcu_xp10 || mcu_ra30 || mcu_se70)
         return ANALOG_LEVEL_BATTERY;
     if (mcu_jv880)
     {
@@ -403,6 +403,10 @@ static uint8_t midi_stage = 0;
 static uint8_t uart_rx_byte;
 static uint64_t uart_rx_delay;
 static uint64_t uart_tx_delay;
+
+static uint64_t encoder_int_delay;
+static uint64_t lcd_delay;
+static bool lcd_ready;
 
 void MCU_DeviceWrite_532(uint32_t address, uint8_t data)
 {
@@ -887,6 +891,7 @@ uint8_t cardram[CARDRAM_SIZE];
 int rom2_mask = ROM2_SIZE - 1;
 
 uint8_t xp_temp[0x4000];
+uint8_t csp_temp[0x4000];
 
 uint8_t MCU_Read(uint32_t address)
 {
@@ -1151,10 +1156,43 @@ uint8_t MCU_Read(uint32_t address)
         {
             if (address < 0x8000)
                 ret = rom2[address];
+            else if (address == 0xfe86) printf("r P3DR\n");
+            else if (address == 0xfe87)
+            {
+                // LEDs & Control
+                printf("r P4DR\n");
+                ret = 0x00;
+            }
+            else if (address == 0xfe8a)
+            {
+                // Buttons
+                uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
+                ret = (~(button_pressed & 0b111111) << 2) | (0b11 << 0);
+            }
+            else if (address == 0xfe8b)
+            {
+                // Encoder button
+                uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
+                ret = 0b11111110 | ~(button_pressed >> 6);
+            }
+            else if (address == 0xfe8e) printf("r P7DR\n");
+            else if (address == 0xfe8f) printf("r P8DR\n");
             else if (address >= 0xfe80 && address <= 0xff1f)
                 ret = MCU_DeviceRead_510(address);
-            else if (address >= 0x8000)
+            else if (address >= 0xc000)
                 ret = sram[address & 0x7fff];
+            else if (address >= 0x8000)
+            {
+                printf("%02x%04x: read CSP %04x\n", mcu.cp, mcu.pc, address & 0x3fff);
+                ret = csp_temp[address & 0x3fff];
+
+                // if (address == 0x8000 && mcu.pc != 0x1e4a)
+                //     ret = 0x7f;
+                if (address == 0x8000)
+                    ret = 0b01;
+                if (address == 0x8001 || address == 0x8002 || address == 0x8003)
+                    ret = 0b00;
+            }
             else
                 printf("%02x%04x: read  %02x%04x\n", mcu.cp, mcu.pc, page, address);
         }
@@ -1162,9 +1200,12 @@ uint8_t MCU_Read(uint32_t address)
             ret = rom2[address_full & 0x7ffff];
         else if (page == 0x8)
         {
-            // ??
-            ret = 0x30;
-            printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+            if (address == 0x8000)
+                ret = lcd_ready ? 0x00 : 0xff; // LCD Busy Flag
+            else if (address < 0x8000)
+                ret = sram[address & 0x7fff];
+            else
+                printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
         }
         else
             printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
@@ -1853,19 +1894,45 @@ void MCU_Write(uint32_t address, uint8_t value)
     {
         if (page == 0)
         {
-            if (address >= 0xfe80 && address <= 0xff1f)
+                 if (address == 0xfe86) printf("w P3DR %x\n", value);
+            else if (address == 0xfe84) printf("w P3DDR %x\n", value);
+            else if (address == 0xfe87) printf("w P4DR %x\n", value);
+            else if (address == 0xfe85) printf("w P4DDR %x\n", value);
+            else if (address == 0xfe8a) printf("w P5DR %x\n", value);
+            else if (address == 0xfe88) printf("w P5DDR %x\n", value);
+            else if (address == 0xfe8b) printf("w P6DR %x\n", value);
+            else if (address == 0xfe89) printf("w P6DDR %x\n", value);
+            else if (address == 0xfe8e) printf("w P7DR %x\n", value);
+            else if (address == 0xfe8f) printf("w P8DR %x\n", value);
+            else if (address == 0xfe8d) printf("w P8DDR %x\n", value);
+            else if (address >= 0xfe80 && address <= 0xff1f)
                 MCU_DeviceWrite_510(address, value);
-            else if (address >= 0x8000)
+            else if (address >= 0xc000)
                 sram[address & 0x7fff] = value;
+            else if (address >= 0x8000)
+            {
+                printf("%02x%04x: write CSP %04x %02x\n", mcu.cp, mcu.pc, address & 0x3fff, value);
+                csp_temp[address & 0x3fff] = value;
+            }
             else
                 printf("%02x%04x: write %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
         }
         else if (page == 0x8)
         {
             if (address == 0x8000)
+            {
                 LCD_Write(0, value);
+                // lcd_ready = false;
+                // lcd_delay = mcu.cycles + 12;
+            }
             else if (address == 0x8001)
+            {
                 LCD_Write(1, value);
+                // lcd_ready = false;
+                // lcd_delay = mcu.cycles + 12;
+            }
+            else if (address < 0x8000)
+                sram[address & 0x7fff] = value;
             else
                 printf("%02x%04x: write %x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
         }
@@ -2075,6 +2142,16 @@ void MCU_Reset(void)
     {
         ga_int_enable = 255;
     }
+
+    encoder_int_delay = 0;
+    lcd_delay = 0;
+    lcd_ready = true;
+
+    // TEST MODE
+    // SDL_AtomicSet(&mcu_button_pressed, ~0b11001111);
+
+    // FACTORY SETTINGS
+    // SDL_AtomicSet(&mcu_button_pressed, ~0b10111111);
 }
 
 void MCU_PostUART(uint8_t data)
@@ -2243,6 +2320,7 @@ int SDLCALL work_thread(void* data)
         // if (mcu.cp == 0x00 && mcu.pc >= 0x0000 && mcu.pc <= 0x0FFF)
         //     printf("pc %02x%04x\n", mcu.cp, mcu.pc);
 
+        // printf("pc %02x%04x\n", mcu.cp, mcu.pc);
         // printf("pc %02x%04x sp %02x%04x\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
         if (!mcu.sleep)
             MCU_ReadInstruction();
@@ -2277,6 +2355,16 @@ int SDLCALL work_thread(void* data)
                     MCU_GA_SetGAInt(1, 1);
                 }
             }
+        }
+
+        if (mcu_se70 && mcu.cycles > encoder_int_delay)
+        {
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ1, 0);
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ2, 0);
+        }
+        if (mcu_se70 && mcu.cycles > lcd_delay)
+        {
+            lcd_ready = true;
         }
 
         MIDI_Update();
@@ -2532,9 +2620,19 @@ void MCU_GA_SetGAInt(int line, int value)
 
 void MCU_EncoderTrigger(int dir)
 {
-    if (!mcu_jv880) return;
-    MCU_GA_SetGAInt(dir == 0 ? 3 : 4, 0);
-    MCU_GA_SetGAInt(dir == 0 ? 3 : 4, 1);
+    if (mcu_jv880)
+    {
+        MCU_GA_SetGAInt(dir == 0 ? 3 : 4, 0);
+        MCU_GA_SetGAInt(dir == 0 ? 3 : 4, 1);
+    }
+    else if (mcu_se70)
+    {
+        if (dir)
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ1, 1);
+        else
+            MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ2, 1);
+        encoder_int_delay = mcu.cycles + 3000;
+    }
 }
 
 static FILE *s_rf[ROM_SET_N_FILES] =
@@ -3240,8 +3338,25 @@ int main(int argc, char *argv[])
     PCM_Reset();
 
     if (resetType != ResetType::NONE) MIDI_Reset(resetType);
+
+    if (mcu_se70)
+    {
+        FILE *f = fopen("sram_se70.bin", "rb");
+        if (f)
+        {
+            fread(sram, 1, 0x8000, f);
+            fclose(f);
+        }
+    }
     
     MCU_Run();
+
+    if (mcu_se70)
+    {
+        FILE *f = fopen("sram_se70.bin", "wb");
+        fwrite(sram, 1, 0x8000, f);
+        fclose(f);
+    }
 
     MCU_CloseAudio();
     MIDI_Quit();

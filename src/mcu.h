@@ -528,6 +528,15 @@ enum {
     // MCU_RA30_TONESELECT_L = 37,
     // MCU_RA30_STYLESELECT_U = 38,
     // MCU_RA30_STYLESELECT_L = 39,
+
+    // SE70
+    MCU_SE70_CONTROL = 0,
+    MCU_SE70_UTILITY = 1,
+    MCU_SE70_PARAM_R = 2,
+    MCU_SE70_PARAM_L = 3,
+    MCU_SE70_WRITE = 4,
+    MCU_SE70_EXIT = 5,
+    MCU_SE70_ENTER = 6,
 };
 
 

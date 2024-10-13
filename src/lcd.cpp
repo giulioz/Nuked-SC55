@@ -346,6 +346,17 @@ const int button_map_xp10[][2] =
     SDL_SCANCODE_0, MCU_XP10_BUTTON_0,
 };
 
+const int button_map_se70[][2] =
+{
+    SDL_SCANCODE_Q, MCU_SE70_EXIT,
+    SDL_SCANCODE_W, MCU_SE70_WRITE,
+    SDL_SCANCODE_A, MCU_SE70_PARAM_L,
+    SDL_SCANCODE_S, MCU_SE70_PARAM_R,
+    SDL_SCANCODE_Z, MCU_SE70_UTILITY,
+    SDL_SCANCODE_X, MCU_SE70_CONTROL,
+    SDL_SCANCODE_TAB, MCU_SE70_ENTER,
+};
+
 
 void LCD_SetBackPath(const std::string &path)
 {
@@ -731,6 +742,7 @@ void LCD_Update(void)
                     mcu_jv880 ? button_map_jv880 :
                     mcu_sc88 ? button_map_sc88 :
                     mcu_ra30 ? button_map_ra30 :
+                    mcu_se70 ? button_map_se70 :
                     button_map_sc55;
                 auto button_size = (
                     mcu_xp10 ? sizeof(button_map_xp10) :
@@ -738,6 +750,7 @@ void LCD_Update(void)
                     mcu_jv880 ? sizeof(button_map_jv880) :
                     mcu_sc88 ? sizeof(button_map_sc88) :
                     mcu_ra30 ? sizeof(button_map_ra30) :
+                    mcu_se70 ? sizeof(button_map_se70) :
                     sizeof(button_map_sc55)
                 ) / sizeof(button_map_sc55[0]);
                 for (size_t i = 0; i < button_size; i++)
