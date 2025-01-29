@@ -556,7 +556,7 @@ void PCM_Update(uint64_t cycles)
 {
     int reg_slots = (pcm.config_reg_3d & 31) + 1;
     int voice_active = pcm.voice_mask & pcm.voice_mask_pending;
-    if (mcu_se70)
+    if (mcu_se70 || mcu_jd800)
     {
         // MOCK for speed
         reg_slots = 10;

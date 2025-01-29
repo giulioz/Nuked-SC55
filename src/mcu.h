@@ -557,6 +557,7 @@ enum {
     ROM_SET_RA30,
     ROM_SET_SY99,
     ROM_SET_SE70,
+    ROM_SET_JD800,
     ROM_SET_COUNT
 };
 
@@ -577,6 +578,7 @@ extern int mcu_sc88vl;
 extern int mcu_xp10;
 extern int mcu_sy99;
 extern int mcu_se70;
+extern int mcu_jd800;
 
 extern int mcu_h8_510;
 

@@ -62,6 +62,7 @@ void MCU_Interrupt_Exception(uint32_t exception)
     if (interrupt == INTERRUPT_SOURCE_IRQ1 && (dev_register[DEV_P1CR] & 0x40) == 0)
         return;
 #endif
+    printf("exception %d\n", exception);
     mcu.exception_pending = exception;
 }
 

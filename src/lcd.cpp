@@ -592,7 +592,7 @@ void LCD_Update(void)
         }
         else
         {
-            if (mcu_jv880 || mcu_xp10 || mcu_rd500 || mcu_ra30 || mcu_se70)
+            if (mcu_jv880 || mcu_xp10 || mcu_rd500 || mcu_ra30 || mcu_se70 || mcu_jd800)
             {
                 uint32_t back_color = 0xFF03be51;
                 for (size_t i = 0; i < lcd_height; i++) {
@@ -616,7 +616,7 @@ void LCD_Update(void)
                 LCD_RenderSegments(10 + 40 * 1, 10, LCD_7SEG[1]);
                 LCD_RenderSegments(10 + 40 * 2, 10, LCD_7SEG[2]);
             }
-            else if (mcu_jv880 || mcu_xp10 || mcu_se70)
+            else if (mcu_jv880 || mcu_xp10 || mcu_se70 || mcu_jd800)
             {
                 int width = mcu_jv880 ? 24 : 16;
                 for (int i = 0; i < 2; i++)

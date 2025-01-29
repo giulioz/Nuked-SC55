@@ -79,7 +79,8 @@ const char* rs_name[ROM_SET_COUNT] = {
     "XP-10",
     "RA-30",
     "SY-99",
-    "SE-70"
+    "SE-70",
+    "JD-800"
 };
 
 static const int ROM_SET_N_FILES = 6;
@@ -197,6 +198,13 @@ const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
     "",
     "",
     "",
+    
+    "jd800_internal.bin",
+    "roland_jd800_program_v1_01.bin",
+    "",
+    "",
+    "",
+    "",
 };
 
 int romset = ROM_SET_MK2;
@@ -240,6 +248,7 @@ int mcu_xp10 = 0; // 0 - SC-55(MK2), 1 - XP-10
 int mcu_ra30 = 0; // 0 - SC-55(MK2), 1 - RA-30
 int mcu_sy99 = 0; // 0 - SC-55(MK2), 1 - SY-99
 int mcu_se70 = 0; // 0 - SC-55(MK2), 1 - SE-70
+int mcu_jd800 = 0; // 0 - SC-55(MK2), 1 - JD-800
 
 int mcu_h8_510 = 0; // 0 - H8/532, 1 - H8/510
 
@@ -524,6 +533,7 @@ void MCU_DeviceWrite_532(uint32_t address, uint8_t data)
     }
     default:
         address += 0;
+        printf("%02x%04x: write dev %04x %02x\n", mcu.cp, mcu.pc, address, data);
         break;
     }
     dev_register[address] = data;
@@ -893,11 +903,15 @@ int rom2_mask = ROM2_SIZE - 1;
 uint8_t xp_temp[0x4000];
 uint8_t csp_temp[0x4000];
 
+uint8_t pccsr = 0x00;
+uint8_t dp_ram[16] = {0};
+uint8_t dsp_ram[0x1000] = {0};
+
 uint8_t MCU_Read(uint32_t address)
 {
     uint32_t address_full = address;
     uint32_t address_rom = address & 0x3ffff;
-    if (address & 0x80000 && !mcu_jv880)
+    if (address & 0x80000 && !mcu_jv880 && !mcu_jd800)
         address_rom |= 0x40000;
     uint8_t page = address >> 16;
     if (!mcu_h8_510) page &= 0xf;
@@ -1207,6 +1221,45 @@ uint8_t MCU_Read(uint32_t address)
             else
                 printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
         }
+        else
+            printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+        return ret;
+    }
+
+    else if (mcu_jd800)
+    {
+        if (page == 0)
+        {
+            if (address < 0x8000)
+                ret = rom1[address];
+            else if (address >= 0xff80)
+                ret = MCU_DeviceRead_532(address & 0x7f);
+            else if (address >= 0xfb80 && address < 0xff80 && (dev_register[DEV_RAME] & 0x80) != 0)
+                ret = ram[(address - 0xfb80) & 0x3ff];
+            else if (address == 0xf106)
+            {
+                printf("read f106\n");
+                ret = ga_int_trigger;
+                ga_int_trigger = 0;
+                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 0);
+            }
+            else if (address >= 0x8000 && address < 0xa000)
+                ret = sram[address & 0x7fff];
+            else if (address == 0xa000)
+                ret = pccsr;
+            else if (address >= 0xe000 && address < 0xefff) {
+                ret = dsp_ram[address];
+                // ret = 0x00;
+                printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+            }
+            else {
+                printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+            }
+        }
+        else if (page <= 0x4)
+            ret = rom2[address_rom & rom2_mask];
+        else if (page == 0xd)
+            ret = sram[address & 0x7fff];
         else
             printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
         return ret;
@@ -1940,6 +1993,52 @@ void MCU_Write(uint32_t address, uint8_t value)
             printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
         return;
     }
+    
+    else if (mcu_jd800)
+    {
+        if (page == 0x0)
+        {
+            if (address >= 0xff80)
+                MCU_DeviceWrite_532(address & 0x7f, value);
+            else if (address >= 0xfb80 && address < 0xff80 && (dev_register[DEV_RAME] & 0x80) != 0)
+                ram[(address - 0xfb80) & 0x3ff] = value;
+            else if (address >= 0xf000 && address < 0xf100) {
+                io_sd = address & 0xff;
+                // LCD_Enable((io_sd & 8) != 0);
+            }
+            else if (address == 0xf105) {
+                printf("%02x%04x: write lcd %x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
+                LCD_Write(0, value);
+                ga_lcd_counter = 500;
+            }
+            else if (address == 0xf104) {
+                printf("%02x%04x: write lcd %x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
+                LCD_Write(1, value);
+                ga_lcd_counter = 500;
+            }
+            else if (address == 0xf107)
+                io_sd = value;
+            else if (address >= 0x8000 && address < 0xa000)
+                sram[address & 0x7fff] = value;
+            else if (address == 0xa000)
+                pccsr = value;
+            else if (address >= 0xa001 && address < 0xa020) {
+                dp_ram[address - 0xa001] = value;
+                pccsr |= 0b10;
+            }
+            else if (address >= 0xe000 && address < 0xefff) {
+                dsp_ram[address] = value;
+                printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+            }
+            else
+                printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+        }
+        else if (page == 0xd)
+            sram[address & 0x7fff] = value;
+        else
+            printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+        return;
+    }
 
     if (page == 0)
     {
@@ -2138,7 +2237,7 @@ void MCU_Reset(void)
 
     MCU_DeviceReset();
 
-    if (mcu_mk1 || mcu_sc88)
+    if (mcu_mk1 || mcu_sc88 || mcu_jd800)
     {
         ga_int_enable = 255;
     }
@@ -2334,7 +2433,7 @@ int SDLCALL work_thread(void* data)
 
         TIMER_Clock(mcu.cycles);
 
-        if (!mcu_mk1 && !mcu_jv880 && !mcu_scb55 && !mcu_rd500 && !mcu_sc88 && !mcu_xp10 && !mcu_ra30 && !mcu_sy99 && !mcu_se70)
+        if (!mcu_mk1 && !mcu_jv880 && !mcu_scb55 && !mcu_rd500 && !mcu_sc88 && !mcu_xp10 && !mcu_ra30 && !mcu_sy99 && !mcu_se70 && !mcu_jd800)
             SM_Update(mcu.cycles);
         else
         {
@@ -2344,13 +2443,14 @@ int SDLCALL work_thread(void* data)
 
         MCU_UpdateAnalog(mcu.cycles);
 
-        if (mcu_mk1 || mcu_sc88)
+        if (mcu_mk1 || mcu_sc88 || mcu_jd800)
         {
             if (ga_lcd_counter)
             {
                 ga_lcd_counter--;
                 if (ga_lcd_counter == 0)
                 {
+                    printf("ga int lcd\n");
                     MCU_GA_SetGAInt(1, 0);
                     MCU_GA_SetGAInt(1, 1);
                 }
@@ -2612,7 +2712,7 @@ void MCU_GA_SetGAInt(int line, int value)
         ga_int_trigger = line;
     ga_int[line] = value;
 
-    if (mcu_jv880 || mcu_sc88)
+    if (mcu_jv880 || mcu_sc88 || mcu_jd800)
         MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, ga_int_trigger != 0);
     else
         MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ1, ga_int_trigger != 0);
@@ -2796,6 +2896,7 @@ int main(int argc, char *argv[])
                 printf("  -xp10                          Use XP-10 ROM set.\n");
                 printf("  -ra30                          Use RA-30 ROM set.\n");
                 printf("  -sy99                          Use SY-99 ROM set.\n");
+                printf("  -jd800                         Use JD-800 ROM set.\n");
                 printf("\n");
                 printf("  -gs                            Reset system in GS mode.\n");
                 printf("  -gm                            Reset system in GM mode.\n");
@@ -2844,6 +2945,11 @@ int main(int argc, char *argv[])
             else if (!strcmp(argv[i], "-se70"))
             {
                 romset = ROM_SET_SE70;
+                autodetect = false;
+            }
+            else if (!strcmp(argv[i], "-jd800"))
+            {
+                romset = ROM_SET_JD800;
                 autodetect = false;
             }
         }
@@ -2906,6 +3012,7 @@ int main(int argc, char *argv[])
     mcu_ra30 = false;
     mcu_sy99 = false;
     mcu_se70 = false;
+    mcu_jd800 = false;
     mcu_h8_510 = false;
     switch (romset)
     {
@@ -2935,6 +3042,12 @@ int main(int argc, char *argv[])
             lcd_height = 100;
             lcd_col1 = 0x000000;
             lcd_col2 = 0x78b500;
+            break;
+        case ROM_SET_JD800:
+            mcu_jd800 = true;
+            rom2_mask /= 2; // rom is half the size
+            lcd_width = 820;
+            lcd_height = 100;
             break;
         case ROM_SET_SCB55:
         case ROM_SET_RLP3237:
@@ -3139,6 +3252,10 @@ int main(int argc, char *argv[])
             unscramble(tempbuf, waverom_card, 0x200000);
         else
             printf("WaveRom PCM not found, skipping it.\n");
+    }
+    else if (mcu_jd800)
+    {
+        // TODO
     }
     else if (mcu_rd500)
     {
