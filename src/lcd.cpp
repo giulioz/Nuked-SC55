@@ -43,13 +43,673 @@
 #include "submcu.h"
 #include "utils/files.h"
 
+static const int lcd_width_max = 2048;
+static const int lcd_height_max = 1024;
+
+
+#define LOG printf
+#define logerror printf
+#define side_eff true
+template <typename T, typename U> constexpr T BIT(T x, U n) noexcept { return (x >> n) & T(1); }
+
+
+#define INSTRUCTION_SYSTEM_SET      0x40
+#define INSTRUCTION_SLEEP_IN        0x53    // unimplemented
+#define INSTRUCTION_DISP_ON         0x59
+#define INSTRUCTION_DISP_OFF        0x58
+#define INSTRUCTION_SCROLL          0x44
+#define INSTRUCTION_CSRFORM         0x5d
+#define INSTRUCTION_CGRAM_ADR       0x5c
+#define INSTRUCTION_CSRDIR_RIGHT    0x4c
+#define INSTRUCTION_CSRDIR_LEFT     0x4d
+#define INSTRUCTION_CSRDIR_UP       0x4e
+#define INSTRUCTION_CSRDIR_DOWN     0x4f
+#define INSTRUCTION_HDOT_SCR        0x5a
+#define INSTRUCTION_OVLAY           0x5b
+#define INSTRUCTION_CSRW            0x46
+#define INSTRUCTION_CSRR            0x47
+#define INSTRUCTION_MWRITE          0x42
+#define INSTRUCTION_MREAD           0x43
+
+
+#define CSRDIR_RIGHT                0x00
+#define CSRDIR_LEFT                 0x01
+#define CSRDIR_UP                   0x02
+#define CSRDIR_DOWN                 0x03
+
+
+#define MX_OR                       0x00
+#define MX_XOR                      0x01    // unimplemented
+#define MX_AND                      0x02    // unimplemented
+#define MX_PRIORITY_OR              0x03    // unimplemented
+
+
+#define FC_OFF                      0x00
+#define FC_SOLID                    0x01
+#define FC_FLASH_32                 0x02    // unimplemented
+#define FC_FLASH_64                 0x03    // unimplemented
+
+
+#define FP_OFF                      0x00
+#define FP_SOLID                    0x01
+#define FP_FLASH_32                 0x02    // unimplemented
+#define FP_FLASH_4                  0x03    // unimplemented
+
+
+struct SedState {
+    int m_bf;                   // busy flag
+
+	uint8_t m_ir;                 // instruction register
+	uint8_t m_dor;                // data output register
+	int m_pbc;                  // parameter byte counter
+
+	int m_d;                    // display enabled
+	int m_sleep;                // sleep mode
+
+	uint16_t m_sag;               // character generator RAM start address
+	int m_m0;                   // character generator ROM (0=internal, 1=external)
+	int m_m1;                   // character generator RAM D6 correction (0=no, 1=yes)
+	int m_m2;                   // height of character bitmaps (0=8, 1=16 pixels)
+	int m_ws;                   // LCD drive method (0=single, 1=dual panel)
+	int m_iv;                   // screen origin compensation for inverse display (0=yes, 1=no)
+	int m_wf;                   // AC frame drive waveform period (0=16-line, 1=2-frame)
+
+	int m_fx;                   // character width in pixels
+	int m_fy;                   // character height in pixels
+	int m_cr;                   // visible line width in characters
+	int m_tcr;                  // total line width in characters (including horizontal blanking)
+	int m_lf;                   // frame height in lines
+	uint16_t m_ap;                // virtual screen line width in characters
+
+	uint16_t m_sad1;              // display page 1 start address
+	uint16_t m_sad2;              // display page 2 start address
+	uint16_t m_sad3;              // display page 3 start address
+	uint16_t m_sad4;              // display page 4 start address
+	int m_sl1;                  // display block 1 height in lines
+	int m_sl2;                  // display block 2 height in lines
+	int m_hdotscr;              // horizontal dot scroll in pixels
+	int m_fp;                   // display page flash control
+
+	uint16_t m_csr;               // cursor address register
+	int m_cd;                   // cursor increment direction
+	int m_crx;                  // cursor width
+	int m_cry;                  // cursor height or location
+	int m_cm;                   // cursor shape (0=underscore, 1=block)
+	int m_fc;                   // cursor flash control
+
+	int m_mx;                   // screen layer composition method
+	int m_dm;                   // display mode for pages 1, 3
+	int m_ov;                   // graphics mode layer composition
+
+    uint8_t vram[0x2000];
+
+    uint8_t readbyte(uint16_t addr)
+    {
+        // if (addr >= 0x2000)
+        // {
+        //     logerror("SED1330 Read invalid address %04x\n", addr);
+        //     exit(1);
+        // }
+        return vram[addr & 0x1fff];
+    }
+    void writebyte(uint16_t addr, uint8_t data)
+    {
+        // if (addr >= 0x2000)
+        // {
+        //     logerror("SED1330 Write to invalid address %04x\n", addr);
+        //     exit(1);
+        // }
+        vram[addr & 0x1fff] = data;
+    }
+
+    inline void increment_csr()
+    {
+        switch (m_cd)
+        {
+        case CSRDIR_RIGHT:
+            m_csr++;
+            break;
+
+        case CSRDIR_LEFT:
+            m_csr--;
+            break;
+
+        case CSRDIR_UP:
+            m_csr -= m_ap;
+            break;
+
+        case CSRDIR_DOWN:
+            m_csr += m_ap;
+            break;
+        }
+    }
+
+    uint8_t status_r()
+    {
+        // if (side_eff)
+        // 	LOG("SED1330 Status Read: %s\n", m_bf ? "busy" : "ready");
+
+        return m_bf << 6;
+    }
+
+
+    //-------------------------------------------------
+    //  command_w -
+    //-------------------------------------------------
+
+    void command_w(uint8_t data)
+    {
+        m_ir = data;
+        m_pbc = 0;
+
+        switch (m_ir)
+        {
+    #if 0
+        case INSTRUCTION_SLEEP_IN:
+            break;
+    #endif
+        case INSTRUCTION_CSRDIR_RIGHT:
+        case INSTRUCTION_CSRDIR_LEFT:
+        case INSTRUCTION_CSRDIR_UP:
+        case INSTRUCTION_CSRDIR_DOWN:
+            m_cd = data & 0x03;
+
+            switch (m_cd)
+            {
+            case CSRDIR_RIGHT:  LOG("SED1330 Cursor Direction: Right\n");  break;
+            case CSRDIR_LEFT:   LOG("SED1330 Cursor Direction: Left\n");   break;
+            case CSRDIR_UP:     LOG("SED1330 Cursor Direction: Up\n");     break;
+            case CSRDIR_DOWN:   LOG("SED1330 Cursor Direction: Down\n");   break;
+            }
+            break;
+        }
+    }
+
+
+    //-------------------------------------------------
+    //  data_r -
+    //-------------------------------------------------
+
+    uint8_t data_r()
+    {
+        uint8_t data = 0;
+
+        switch (m_ir)
+        {
+        case INSTRUCTION_MREAD:
+            data = readbyte(m_csr);
+            if (side_eff)
+            {
+                LOG("SED1330 Memory Read %02x from %04x\n", data, m_csr);
+                increment_csr();
+            }
+            break;
+
+        case INSTRUCTION_CSRR:
+            switch (m_pbc)
+            {
+            case 0:
+                data = m_csr & 0xff;
+                break;
+
+            case 1:
+                data = (m_csr & 0xff00) >> 8;
+                break;
+
+            default:
+                logerror("SED1330 Invalid parameter byte %02x\n", data);
+            }
+            if (side_eff)
+            {
+                LOG("SED1330 Cursor Byte %d Read %02x\n", m_pbc, data);
+                m_pbc++;
+            }
+            break;
+
+        default:
+            logerror("SED1330 Unsupported instruction %02x\n", m_ir);
+            break;
+        }
+
+        return data;
+    }
+
+
+    //-------------------------------------------------
+    //  data_w -
+    //-------------------------------------------------
+
+    void data_w(uint8_t data)
+    {
+        switch (m_ir)
+        {
+        case INSTRUCTION_SYSTEM_SET:
+            switch (m_pbc)
+            {
+            case 0:
+                m_m0 = BIT(data, 0);
+                m_m1 = BIT(data, 1);
+                m_m2 = BIT(data, 2);
+                m_ws = BIT(data, 3);
+                m_iv = BIT(data, 5);
+
+                LOG("SED1330 %s CG ROM\n", BIT(data, 0) ? "External" : "Internal");
+                LOG("SED1330 D6 Correction: %s\n", BIT(data, 1) ? "enabled" : "disabled");
+                LOG("SED1330 Character Height: %u\n", BIT(data, 2) ? 16 : 8);
+                LOG("SED1330 %s Panel Drive\n", BIT(data, 3) ? "Dual" : "Single");
+                LOG("SED1330 Screen Top-Line Correction: %s\n", BIT(data, 5) ? "disabled" : "enabled");
+                break;
+
+            case 1:
+                m_fx = (data & 0x07) + 1;
+                m_wf = BIT(data, 7);
+
+                LOG("SED1330 Horizontal Character Size: %u\n", m_fx);
+                LOG("SED1330 %s AC Drive\n", BIT(data, 7) ? "2-frame" : "16-line");
+                break;
+
+            case 2:
+                m_fy = (data & 0x0f) + 1;
+                LOG("SED1330 Vertical Character Size: %u\n", m_fy);
+                break;
+
+            case 3:
+                m_cr = data + 1;
+                LOG("SED1330 Visible Characters Per Line: %u\n", m_cr);
+                break;
+
+            case 4:
+                m_tcr = data + 1;
+                LOG("SED1330 Total Characters Per Line: %u\n", m_tcr);
+                break;
+
+            case 5:
+                m_lf = data + 1;
+                LOG("SED1330 Frame Height: %u\n", m_lf);
+                if (clock() != 0)
+                {
+                    // attotime fr = clocks_to_attotime(m_tcr * m_lf * 9);
+                    // screen().configure(m_tcr * m_fx, m_lf, screen().visible_area(), fr.as_attoseconds());
+                    // LOG("SED1330 Frame Rate: %.1f Hz\n", fr.as_hz());
+                }
+                break;
+
+            case 6:
+                m_ap = (m_ap & 0xff00) | data;
+                break;
+
+            case 7:
+                m_ap = (data << 8) | (m_ap & 0xff);
+                LOG("SED1330 Virtual Screen Width: %u\n", m_ap);
+                break;
+
+            default:
+                logerror("SED1330 Invalid parameter byte %02x\n", data);
+            }
+            break;
+
+        case INSTRUCTION_DISP_ON:
+        case INSTRUCTION_DISP_OFF:
+            m_d = BIT(m_ir, 0);
+            m_fc = data & 0x03;
+            m_fp = data >> 2;
+            LOG("SED1330 Display: %s\n", BIT(m_ir, 0) ? "enabled" : "disabled");
+
+            switch (m_fc)
+            {
+            case FC_OFF:        LOG("SED1330 Cursor: disabled\n"); break;
+            case FC_SOLID:      LOG("SED1330 Cursor: solid\n");    break;
+            case FC_FLASH_32:   LOG("SED1330 Cursor: fFR/32\n");   break;
+            case FC_FLASH_64:   LOG("SED1330 Cursor: fFR/64\n");   break;
+            }
+
+            switch (m_fp & 0x03)
+            {
+            case FP_OFF:        LOG("SED1330 Display Page 1: disabled\n");     break;
+            case FP_SOLID:      LOG("SED1330 Display Page 1: enabled\n");      break;
+            case FP_FLASH_32:   LOG("SED1330 Display Page 1: flash fFR/32\n"); break;
+            case FP_FLASH_4:    LOG("SED1330 Display Page 1: flash fFR/4\n");  break;
+            }
+
+            switch ((m_fp >> 2) & 0x03)
+            {
+            case FP_OFF:        LOG("SED1330 Display Page 2/4: disabled\n");       break;
+            case FP_SOLID:      LOG("SED1330 Display Page 2/4: enabled\n");        break;
+            case FP_FLASH_32:   LOG("SED1330 Display Page 2/4: flash fFR/32\n");   break;
+            case FP_FLASH_4:    LOG("SED1330 Display Page 2/4: flash fFR/4\n");    break;
+            }
+
+            switch ((m_fp >> 4) & 0x03)
+            {
+            case FP_OFF:        LOG("SED1330 Display Page 3: disabled\n");     break;
+            case FP_SOLID:      LOG("SED1330 Display Page 3: enabled\n");      break;
+            case FP_FLASH_32:   LOG("SED1330 Display Page 3: flash fFR/32\n"); break;
+            case FP_FLASH_4:    LOG("SED1330 Display Page 3: flash fFR/4\n");  break;
+            }
+            break;
+
+        case INSTRUCTION_SCROLL:
+            switch (m_pbc)
+            {
+            case 0:
+                m_sad1 = (m_sad1 & 0xff00) | data;
+                break;
+
+            case 1:
+                m_sad1 = (data << 8) | (m_sad1 & 0xff);
+                LOG("SED1330 Display Page 1 Start Address: %04x\n", m_sad1);
+                break;
+
+            case 2:
+                m_sl1 = data + 1;
+                LOG("SED1330 Display Block 1 Screen Lines: %u\n", m_sl1);
+                break;
+
+            case 3:
+                m_sad2 = (m_sad2 & 0xff00) | data;
+                break;
+
+            case 4:
+                m_sad2 = (data << 8) | (m_sad2 & 0xff);
+                LOG("SED1330 Display Page 2 Start Address: %04x\n", m_sad2);
+                break;
+
+            case 5:
+                m_sl2 = data + 1;
+                LOG("SED1330 Display Block 2 Screen Lines: %u\n", m_sl2);
+                break;
+
+            case 6:
+                m_sad3 = (m_sad3 & 0xff00) | data;
+                break;
+
+            case 7:
+                m_sad3 = (data << 8) | (m_sad3 & 0xff);
+                LOG("SED1330 Display Page 3 Start Address: %04x\n", m_sad3);
+                break;
+
+            case 8:
+                m_sad4 = (m_sad4 & 0xff00) | data;
+                break;
+
+            case 9:
+                m_sad4 = (data << 8) | (m_sad4 & 0xff);
+                LOG("SED1330 Display Page 4 Start Address: %04x\n", m_sad4);
+                break;
+
+            default:
+                logerror("SED1330 Invalid parameter byte %02x\n", data);
+            }
+            break;
+
+        case INSTRUCTION_CSRFORM:
+            switch (m_pbc)
+            {
+            case 0:
+                m_crx = (data & 0x0f) + 1;
+                LOG("SED1330 Horizontal Cursor Size: %u\n", m_crx);
+                break;
+
+            case 1:
+                m_cry = (data & 0x0f) + 1;
+                m_cm = BIT(data, 7);
+                LOG("SED1330 Vertical Cursor Location: %u\n", m_cry);
+                LOG("SED1330 Cursor Shape: %s\n", BIT(data, 7) ? "Block" : "Underscore");
+                break;
+
+            default:
+                logerror("SED1330 Invalid parameter byte %02x\n", data);
+            }
+            break;
+
+        case INSTRUCTION_CGRAM_ADR:
+            switch (m_pbc)
+            {
+            case 0:
+                m_sag = (m_sag & 0xff00) | data;
+                break;
+
+            case 1:
+                m_sag = (data << 8) | (m_sag & 0xff);
+                LOG("SED1330 Character Generator RAM Start Address: %04x\n", m_sag);
+                break;
+
+            default:
+                logerror("SED1330 Invalid parameter byte %02x\n", data);
+            }
+            break;
+
+        case INSTRUCTION_HDOT_SCR:
+            m_hdotscr = data & 0x07;
+            LOG("SED1330 Horizontal Dot Scroll: %u\n", m_hdotscr);
+            break;
+
+        case INSTRUCTION_OVLAY:
+            m_mx = data & 0x03;
+            m_dm = (data >> 2) & 0x03;
+            m_ov = BIT(data, 4);
+
+            switch (m_mx)
+            {
+            case MX_OR:             LOG("SED1330 Display Composition Method: OR\n");           break;
+            case MX_XOR:            LOG("SED1330 Display Composition Method: Exclusive-OR\n"); break;
+            case MX_AND:            LOG("SED1330 Display Composition Method: AND\n");          break;
+            case MX_PRIORITY_OR:    LOG("SED1330 Display Composition Method: Priority-OR\n");  break;
+            }
+
+            LOG("SED1330 Display Page 1 Mode: %s\n", BIT(data, 2) ? "Graphics" : "Text");
+            LOG("SED1330 Display Page 3 Mode: %s\n", BIT(data, 3) ? "Graphics" : "Text");
+            LOG("SED1330 Display Composition Layers: %u\n", BIT(data, 4) ? 3 : 2);
+            break;
+
+        case INSTRUCTION_CSRW:
+            switch (m_pbc)
+            {
+            case 0:
+                m_csr = (m_csr & 0xff00) | data;
+                break;
+
+            case 1:
+                m_csr = (data << 8) | (m_csr & 0xff);
+                LOG("SED1330 Cursor Address %04x\n", m_csr);
+                break;
+
+            default:
+                logerror("SED1330 Invalid parameter byte %02x\n", data);
+            }
+            break;
+    #if 0
+        case INSTRUCTION_CSRR:
+            break;
+    #endif
+        case INSTRUCTION_MWRITE:
+            LOG("SED1330 Memory Write %02x %c to %04x (row %u col %u line %u)\n", data, data, m_csr, m_csr/80/8, m_csr%80, m_csr/80);
+
+            writebyte(m_csr, data);
+
+            increment_csr();
+            break;
+    #if 0
+        case INSTRUCTION_MREAD:
+            break;
+    #endif
+        default:
+            logerror("SED1330 Unsupported instruction %02x\n", m_ir);
+        }
+
+        m_pbc++;
+    }
+
+
+    //-------------------------------------------------
+    //  draw_text_scanline -
+    //-------------------------------------------------
+
+    void draw_text_scanline(uint32_t lcd_buffer[lcd_height_max][lcd_width_max], int y, int r, uint16_t va, bool cursor)
+    {
+        uint32_t *p = &lcd_buffer[y][0];
+
+        for (int sx = 0; sx < m_cr; sx++, p += m_fx)
+        {
+            if (m_m0 && !m_m1)
+            {
+                uint8_t c = readbyte(va + sx);
+                uint8_t data = readbyte(0xf000 | (m_m2 ? std::uint16_t(c) << 4 | r : std::uint16_t(c) << 3 | (r & 7)));
+                for (int x = 0; x < m_fx; x++, data <<= 1)
+                    if (BIT(data, 7))
+                        p[x] |= 1;
+            }
+
+            if (cursor && (va + sx) == m_csr)
+            {
+                if (m_cm)
+                {
+                    // block cursor
+                    if (r < m_cry)
+                    {
+                        std::fill_n(p, m_crx, 1);
+                    }
+                }
+                else
+                {
+                    // underscore cursor
+                    if (r == m_cry)
+                    {
+                        std::fill_n(p, m_crx, 1);
+                    }
+                }
+            }
+        }
+    }
+
+
+    //-------------------------------------------------
+    //  draw_graphics_scanline -
+    //-------------------------------------------------
+
+    void draw_graphics_scanline(uint32_t lcd_buffer[lcd_height_max][lcd_width_max], int y, uint16_t va)
+    {
+        for (int sx = 0; sx < m_cr; sx++)
+        {
+            uint8_t data = readbyte(va++);
+
+            for (int x = 0; x < m_fx; x++)
+            {
+                lcd_buffer[y][(sx * m_fx) + x] |= BIT(data, 7);
+                data <<= 1;
+            }
+        }
+    }
+
+
+    //-------------------------------------------------
+    //  update_graphics -
+    //-------------------------------------------------
+
+    void update_graphics(uint32_t lcd_buffer[lcd_height_max][lcd_width_max])
+    {
+        for (int y = 0; y < m_lf; y++)
+        {
+            uint16_t sad2 = m_sad2 + (y * m_ap);
+            // draw graphics display page 2 scanline
+            draw_graphics_scanline(lcd_buffer, y, sad2);
+
+            uint16_t sad1 = m_sad1 + ((y / m_fy) * m_ap);
+            // draw text display page 1 scanline
+            draw_text_scanline(lcd_buffer, y, y % m_fy, sad1, !m_ov && m_fc != FC_OFF);
+        }
+    }
+
+
+    //-------------------------------------------------
+    //  update_text -
+    //-------------------------------------------------
+
+    void update_text(uint32_t lcd_buffer[lcd_height_max][lcd_width_max])
+    {
+        uint8_t attr1 = m_fp & 0x03;
+        uint8_t attr2 = (m_fp >> 2) & 0x03;
+        uint8_t attr3 = (m_fp >> 4) & 0x03;
+
+        for (int y = 0; y < m_lf; y++)
+        {
+            if (y >= m_sl1)
+            {
+                if (attr3 != FP_OFF)
+                {
+                    uint16_t sad3 = m_sad3 + (((y - m_sl1) / m_fy) * m_ap);
+
+                    // draw text display page 3 scanline
+                    draw_text_scanline(lcd_buffer, y, (y - m_sl1) % m_fy, sad3, m_ov && m_fc != FC_OFF);
+                }
+            }
+            else
+            {
+                if (attr1 != FP_OFF)
+                {
+                    uint16_t sad1 = m_sad1 + ((y / m_fy) * m_ap);
+
+                    // draw text display page 1 scanline
+                    draw_text_scanline(lcd_buffer, y, y % m_fy, sad1, !m_ov && m_fc != FC_OFF);
+                }
+            }
+
+            if (attr2 != FP_OFF)
+            {
+                if (m_ws && y >= m_sl2)
+                {
+                    uint16_t sad4 = m_sad4 + ((y - m_sl2) * m_ap);
+
+                    // draw graphics display page 4 scanline
+                    draw_graphics_scanline(lcd_buffer, y, sad4);
+                }
+                else
+                {
+                    uint16_t sad2 = m_sad2 + (y * m_ap);
+
+                    // draw graphics display page 2 scanline
+                    draw_graphics_scanline(lcd_buffer, y, sad2);
+                }
+            }
+        }
+    }
+
+
+    //-------------------------------------------------
+    //  screen_update -
+    //-------------------------------------------------
+
+    uint32_t screen_update(uint32_t lcd_buffer[lcd_height_max][lcd_width_max])
+    {
+        for (size_t i = 0; i < lcd_height_max * lcd_width_max; i++)
+        {
+            lcd_buffer[i / lcd_width_max][i % lcd_width_max] = 0;
+        }
+        
+        if (m_d)
+        {
+            if (m_dm)
+            {
+                update_graphics(lcd_buffer);
+            }
+            else
+            {
+                update_text(lcd_buffer);
+            }
+        }
+        return 0;
+    }
+
+};
 
 static uint32_t LCD_DL, LCD_N, LCD_F, LCD_D, LCD_C, LCD_B, LCD_ID = 1, LCD_S;
 static uint32_t LCD_DD_RAM, LCD_AC, LCD_CG_RAM;
 static uint32_t LCD_RAM_MODE = 0;
-static uint8_t LCD_Data[80];
-static uint8_t LCD_CG[64];
-static uint8_t LCD_7SEG[3];
+uint8_t LCD_Data[80];
+uint8_t LCD_CG[64];
+uint8_t LCD_7SEG[3];
+
+static SedState sed_state;
 
 static uint8_t lcd_enable = 1;
 static bool lcd_quit_requested = false;
@@ -66,6 +726,13 @@ bool LCD_QuitRequested()
 
 void LCD_Write(uint32_t address, uint8_t data)
 {
+    if (mcu_jd990)
+    {
+        if ((address & 0x3) == 0x0) sed_state.data_w(data);
+        if ((address & 0x3) == 0x2) sed_state.command_w(data);
+        return;
+    }
+
     if (address == 0)
     {
         if ((data & 0xe0) == 0x20)
@@ -170,8 +837,6 @@ void LCD_Write_7seg(uint8_t address, uint8_t data)
 
 int lcd_width = 741;
 int lcd_height = 268;
-static const int lcd_width_max = 1024;
-static const int lcd_height_max = 1024;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
@@ -353,8 +1018,78 @@ const int button_map_se70[][2] =
     SDL_SCANCODE_A, MCU_SE70_PARAM_L,
     SDL_SCANCODE_S, MCU_SE70_PARAM_R,
     SDL_SCANCODE_Z, MCU_SE70_UTILITY,
-    SDL_SCANCODE_X, MCU_SE70_CONTROL,
+    SDL_SCANCODE_X, MCU_SE70_CONTROL1,
+    SDL_SCANCODE_C, MCU_SE70_CONTROL2,
+    SDL_SCANCODE_V, MCU_SE70_CONTROL3,
     SDL_SCANCODE_TAB, MCU_SE70_ENTER,
+};
+
+const int button_map_jd800[][2] =
+{
+    SDL_SCANCODE_UNKNOWN, 0x00, // PORTAMENTO
+    SDL_SCANCODE_UNKNOWN, 0x01, // SOLO
+    SDL_SCANCODE_UNKNOWN, 0x02, // KEY TRANSPOSE
+    SDL_SCANCODE_UNKNOWN, 0x03, // MULTI SETUP EFFECT
+    SDL_SCANCODE_I, 0x04, // PART R
+    SDL_SCANCODE_Y, 0x05, // MIDI
+    SDL_SCANCODE_T, 0x06, // PART EDIT
+    SDL_SCANCODE_UNKNOWN, 0x07, // 
+    SDL_SCANCODE_UNKNOWN, 0x08, // BANK 7
+    SDL_SCANCODE_UNKNOWN, 0x09, // BANK 5
+    SDL_SCANCODE_UNKNOWN, 0x0a, // BANK 4
+    SDL_SCANCODE_X, 0x0b, // BANK 2
+    SDL_SCANCODE_UNKNOWN, 0x0c, // BANK 8
+    SDL_SCANCODE_UNKNOWN, 0x0d, // COPY
+    SDL_SCANCODE_Z, 0x0e, // BANK 1
+    SDL_SCANCODE_LEFT, 0x0f, // CURSOR L
+    SDL_SCANCODE_R, 0x10, // PATCH EDIT EFFECT
+    SDL_SCANCODE_E, 0x11, // COMMON
+    SDL_SCANCODE_UNKNOWN, 0x12, // LAYER ACTIVE
+    SDL_SCANCODE_UNKNOWN, 0x13, // SPECIAL SETUP
+    SDL_SCANCODE_U, 0x14, // PART L
+    SDL_SCANCODE_W, 0x15, // TUNE/FUNC
+    SDL_SCANCODE_UNKNOWN, 0x16, // WG BEND
+    SDL_SCANCODE_Q, 0x17, // WG SOURCE
+    SDL_SCANCODE_ESCAPE, 0x18, // EXIT
+    SDL_SCANCODE_O, 0x19, // INC/YES
+    SDL_SCANCODE_UNKNOWN, 0x1a, // TVF MODE
+    SDL_SCANCODE_UNKNOWN, 0x1b, // TVF LFO SELECT
+    SDL_SCANCODE_UNKNOWN, 0x1c, // TVA BIAS DIRECTION
+    SDL_SCANCODE_UNKNOWN, 0x1d, // TVA LFO SELECT
+    SDL_SCANCODE_L, 0x1e, // PAGE U
+    SDL_SCANCODE_K, 0x1f, // PAGE D
+    SDL_SCANCODE_7, 0x20, // NUMBER 7
+    SDL_SCANCODE_UNKNOWN, 0x21, // BANK 6
+    SDL_SCANCODE_4, 0x22, // NUMBER 4
+    SDL_SCANCODE_C, 0x23, // BANK 3
+    SDL_SCANCODE_UNKNOWN, 0x24, // COMPARE
+    SDL_SCANCODE_UNKNOWN, 0x25, // MANUAL
+    SDL_SCANCODE_1, 0x26, // NUMBER 1
+    SDL_SCANCODE_RIGHT, 0x27, // CURSOR R
+    SDL_SCANCODE_UNKNOWN, 0x28, // TONE D
+    SDL_SCANCODE_UNKNOWN, 0x29, // TONE C
+    SDL_SCANCODE_UNKNOWN, 0x2a, // TONE B
+    SDL_SCANCODE_UNKNOWN, 0x2b, // TONE A
+    SDL_SCANCODE_M, 0x2c, // MULTI
+    SDL_SCANCODE_UNKNOWN, 0x2d, // SINGLE
+    SDL_SCANCODE_UNKNOWN, 0x2e, // LFO1 WAVEFORM
+    SDL_SCANCODE_UNKNOWN, 0x2f, // LFO1 OFFSET
+    SDL_SCANCODE_P, 0x30, // DEC/NO
+    SDL_SCANCODE_UNKNOWN, 0x31, // WG A-TOUCH BEND
+    SDL_SCANCODE_UNKNOWN, 0x32, // LFO2 WAVEFORM
+    SDL_SCANCODE_UNKNOWN, 0x33, // LFO2 KEY TRIG
+    SDL_SCANCODE_UNKNOWN, 0x34, // COMMON VELOCITY CURVE
+    SDL_SCANCODE_UNKNOWN, 0x35, // COMMON HOLD CONTROL
+    SDL_SCANCODE_UNKNOWN, 0x36, // LFO2 OFFSET
+    SDL_SCANCODE_UNKNOWN, 0x37, // LFO1 KEY TRIG
+    SDL_SCANCODE_8, 0x38, // NUMBER 8
+    SDL_SCANCODE_6, 0x39, // NUMBER 6
+    SDL_SCANCODE_5, 0x3a, // NUMBER 5
+    SDL_SCANCODE_3, 0x3b, // NUMBER 3
+    SDL_SCANCODE_UNKNOWN, 0x3c, // WRITE
+    SDL_SCANCODE_UNKNOWN, 0x3d, // DATA TRANSFER
+    SDL_SCANCODE_2, 0x3e, // NUMBER 2
+    SDL_SCANCODE_UNKNOWN, 0x3f, // INT/CARD
 };
 
 
@@ -586,15 +1321,16 @@ void LCD_Update(void)
     {
         MCU_WorkThread_Lock();
 
-        if (!lcd_enable && !mcu_jv880)
+        if (!lcd_enable && !mcu_jv880 && !mcu_jd990)
         {
             memset(lcd_buffer, 0, sizeof(lcd_buffer));
         }
         else
         {
-            if (mcu_jv880 || mcu_xp10 || mcu_rd500 || mcu_ra30 || mcu_se70 || mcu_jd800)
+            if (mcu_jv880 || mcu_xp10 || mcu_rd500 || mcu_ra30 || mcu_se70 || mcu_jd800 || mcu_jd990)
             {
                 uint32_t back_color = 0xFF03be51;
+                if (mcu_jd800) back_color = lcd_background[0][0];
                 for (size_t i = 0; i < lcd_height; i++) {
                     for (size_t j = 0; j < lcd_width; j++) {
                         lcd_buffer[i][j] = back_color;
@@ -616,9 +1352,24 @@ void LCD_Update(void)
                 LCD_RenderSegments(10 + 40 * 1, 10, LCD_7SEG[1]);
                 LCD_RenderSegments(10 + 40 * 2, 10, LCD_7SEG[2]);
             }
+            else if (mcu_jd990)
+            {
+                sed_state.screen_update(lcd_buffer);
+                for (size_t y = 0; y < lcd_height_max; y++)
+                {
+                    for (size_t x = 0; x < lcd_width_max; x++)
+                    {
+                        if (lcd_buffer[y][x] == 0)
+                            lcd_buffer[y][x] = 0xFF000000;
+                        else
+                            lcd_buffer[y][x] = 0xFFFFFFFF;
+                    }
+                }
+                
+            }
             else if (mcu_jv880 || mcu_xp10 || mcu_se70 || mcu_jd800)
             {
-                int width = mcu_jv880 ? 24 : 16;
+                int width = mcu_jd800 ? 40 : mcu_jv880 ? 24 : 16;
                 for (int i = 0; i < 2; i++)
                 {
                     for (int j = 0; j < width; j++)
@@ -720,51 +1471,79 @@ void LCD_Update(void)
                 if (sdl_event.key.repeat)
                     continue;
                 
-                if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYDOWN)
+                // if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYDOWN)
+                // {
+                //     MCU_PostUART(0x90);
+                //     MCU_PostUART(0x30);
+                //     MCU_PostUART(0x7f);
+                // }
+                // else if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYUP)
+                // {
+                //     MCU_PostUART(0x80);
+                //     MCU_PostUART(0x30);
+                //     MCU_PostUART(0);
+                // }
+
+                if (sdl_event.key.keysym.scancode == SDL_SCANCODE_F4 && sdl_event.type == SDL_KEYDOWN)
                 {
-                    MCU_PostUART(0x90);
-                    MCU_PostUART(0x30);
-                    MCU_PostUART(0x7f);
+                    saveLSP();
                 }
-                else if (sdl_event.key.keysym.scancode == SDL_SCANCODE_L && sdl_event.type == SDL_KEYUP)
+                if (sdl_event.key.keysym.scancode == SDL_SCANCODE_F5 && sdl_event.type == SDL_KEYDOWN)
                 {
-                    MCU_PostUART(0x80);
-                    MCU_PostUART(0x30);
-                    MCU_PostUART(0);
+                    saveState();
+                }
+                if (sdl_event.key.keysym.scancode == SDL_SCANCODE_F6 && sdl_event.type == SDL_KEYDOWN)
+                {
+                    loadState();
                 }
                 
                 int mask = 0;
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
 
-                auto button_map =
-                    mcu_xp10 ? button_map_xp10 :
-                    mcu_rd500 ? button_map_rd500 :
-                    mcu_jv880 ? button_map_jv880 :
-                    mcu_sc88 ? button_map_sc88 :
-                    mcu_ra30 ? button_map_ra30 :
-                    mcu_se70 ? button_map_se70 :
-                    button_map_sc55;
-                auto button_size = (
-                    mcu_xp10 ? sizeof(button_map_xp10) :
-                    mcu_rd500 ? sizeof(button_map_rd500) :
-                    mcu_jv880 ? sizeof(button_map_jv880) :
-                    mcu_sc88 ? sizeof(button_map_sc88) :
-                    mcu_ra30 ? sizeof(button_map_ra30) :
-                    mcu_se70 ? sizeof(button_map_se70) :
-                    sizeof(button_map_sc55)
-                ) / sizeof(button_map_sc55[0]);
-                for (size_t i = 0; i < button_size; i++)
+                printf("key %s %d\n", SDL_GetScancodeName(sdl_event.key.keysym.scancode), sdl_event.type);
+
+                if (mcu_jd800)
                 {
-                    if (button_map[i][0] == sdl_event.key.keysym.scancode)
-                        mask |= (1 << button_map[i][1]);
+                    for (size_t i = 0; i < sizeof(button_map_jd800) / sizeof(button_map_jd800[0]); i++)
+                    {
+                        if (button_map_jd800[i][0] == sdl_event.key.keysym.scancode)
+                            jd800_btn_down[button_map_jd800[i][1]] = sdl_event.type == SDL_KEYDOWN;
+                    }
+                }
+                else
+                {
+                    auto button_map =
+                        mcu_xp10 ? button_map_xp10 :
+                        mcu_rd500 ? button_map_rd500 :
+                        mcu_jv880 ? button_map_jv880 :
+                        (mcu_sc88 || mcu_sc88pro) ? button_map_sc88 :
+                        mcu_ra30 ? button_map_ra30 :
+                        mcu_se70 ? button_map_se70 :
+                        button_map_sc55;
+                    auto button_size = (
+                        mcu_xp10 ? sizeof(button_map_xp10) :
+                        mcu_rd500 ? sizeof(button_map_rd500) :
+                        mcu_jv880 ? sizeof(button_map_jv880) :
+                        (mcu_sc88 || mcu_sc88pro) ? sizeof(button_map_sc88) :
+                        mcu_ra30 ? sizeof(button_map_ra30) :
+                        mcu_se70 ? sizeof(button_map_se70) :
+                        sizeof(button_map_sc55)
+                    ) / sizeof(button_map_sc55[0]);
+                    for (size_t i = 0; i < button_size; i++)
+                    {
+                        if (button_map[i][0] == sdl_event.key.keysym.scancode)
+                            mask |= (1 << button_map[i][1]);
+                    }
+
+                    if (sdl_event.type == SDL_KEYDOWN)
+                        button_pressed |= mask;
+                    else
+                        button_pressed &= ~mask;
                 }
 
-                if (sdl_event.type == SDL_KEYDOWN)
-                    button_pressed |= mask;
-                else
-                    button_pressed &= ~mask;
-
                 SDL_AtomicSet(&mcu_button_pressed, (int)button_pressed);
+
+                // printf("button_pressed %02x\n", button_pressed);
 
 #if 0
                 if (sdl_event.key.keysym.scancode >= SDL_SCANCODE_1 && sdl_event.key.keysym.scancode < SDL_SCANCODE_0)

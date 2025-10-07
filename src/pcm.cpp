@@ -48,6 +48,23 @@ uint8_t waverom_exp[0x800000];
 
 uint8_t PCM_ReadROM(uint32_t address)
 {
+    if (mcu_jd800)
+    {
+        if ((address >> 21) == 0x00) {
+            return waverom1[address & 0xfffff];
+        }
+        else if ((address >> 21) == 0x01) {
+            return waverom2[address & 0xfffff];
+        }
+        else if ((address >> 21) == 0x02) {
+            return 0xff; // card
+        }
+        else if ((address >> 21) == 0x03) {
+            return waverom3[address & 0xfffff];
+        }
+        return 0xff;
+    }
+
     int bank;
     if (pcm.config_reg_3d & 0x20)
         bank = (address >> 21) & 7;
@@ -61,19 +78,19 @@ uint8_t PCM_ReadROM(uint32_t address)
             else
                 return waverom1[address & 0x1fffff];
         case 1:
-            if (!mcu_jv880 && !mcu_rd500 && !mcu_xp10 && !mcu_sc88)
+            if (!mcu_jv880 && !mcu_rd500 && !mcu_xp10 && !(mcu_sc88 || mcu_sc88pro))
                 return waverom2[address & 0xfffff];
             else
                 return waverom2[address & 0x1fffff];
         case 2:
             if (mcu_jv880)
                 return waverom_card[address & 0x1fffff];
-            else if (mcu_rd500 || mcu_sc88)
+            else if (mcu_rd500 || mcu_sc88 || mcu_sc88pro)
                 return waverom3[address & 0x1fffff];
             else
                 return waverom3[address & 0xfffff];
         case 3:
-            if (mcu_sc88)
+            if (mcu_sc88 || mcu_sc88pro)
                 return waverom4[address & 0x1fffff];
         case 4:
         case 5:
@@ -89,7 +106,7 @@ uint8_t PCM_ReadROM(uint32_t address)
 }
 
 void PCM_Write(uint32_t address, uint8_t data)
-{
+{   
     address &= 0x3f;
     if (address < 0x4) // voice enable
     {
@@ -556,7 +573,7 @@ void PCM_Update(uint64_t cycles)
 {
     int reg_slots = (pcm.config_reg_3d & 31) + 1;
     int voice_active = pcm.voice_mask & pcm.voice_mask_pending;
-    if (mcu_se70 || mcu_jd800)
+    if (mcu_se70 || mcu_jd800 || mcu_sc88pro)
     {
         // MOCK for speed
         reg_slots = 10;

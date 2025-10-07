@@ -6,6 +6,9 @@ include(GNUInstallDirs)
 include(CheckCXXCompilerFlag)
 include(CheckFunctionExists)
 
+# add_compile_options(-fsanitize=address)
+# add_link_options(-fsanitize=address)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Prefer C++11 standard

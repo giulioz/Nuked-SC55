@@ -53,6 +53,10 @@ struct mcu_timer_t {
     uint8_t status_rd;
 };
 
+extern uint64_t timer_cycles;
+extern uint8_t timer_tempreg;
+extern frt_t frt[3];
+extern mcu_timer_t timer;
 extern uint8_t dev_WDT_TCSR;
 extern uint8_t dev_WDT_TCNT;
 

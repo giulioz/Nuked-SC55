@@ -203,9 +203,13 @@ extern mcu_t mcu;
 
 void MCU_ErrorTrap(void);
 
-uint8_t MCU_Read(uint32_t address);
-uint16_t MCU_Read16(uint32_t address);
-uint32_t MCU_Read32(uint32_t address);
+void saveLSP();
+void saveState();
+void loadState(const char* path = "state.bin");
+
+uint8_t MCU_Read(uint32_t address, bool code);
+uint16_t MCU_Read16(uint32_t address, bool code);
+uint32_t MCU_Read32(uint32_t address, bool code);
 void MCU_Write(uint32_t address, uint8_t value);
 void MCU_Write16(uint32_t address, uint16_t value);
 
@@ -214,7 +218,7 @@ inline uint32_t MCU_GetAddress(uint8_t page, uint16_t address) {
 }
 
 inline uint8_t MCU_ReadCode(void) {
-    return MCU_Read(MCU_GetAddress(mcu.cp, mcu.pc));
+    return MCU_Read(MCU_GetAddress(mcu.cp, mcu.pc), true);
 }
 
 inline uint8_t MCU_ReadCodeAdvance(void) {
@@ -230,7 +234,7 @@ inline void MCU_SetRegisterByte(uint8_t reg, uint8_t val)
 
 inline uint32_t MCU_GetVectorAddress(uint32_t vector)
 {
-    return MCU_Read32(vector * 4);
+    return MCU_Read32(vector * 4, true);
 }
 
 inline uint32_t MCU_GetPageForRegister(uint32_t reg)
@@ -253,15 +257,24 @@ inline void MCU_ControlRegisterWrite(uint32_t reg, uint32_t siz, uint32_t data)
         }
         else if (reg == 5) // FIXME: undocumented
         {
+            // printf("fixme 3\n");
             mcu.dp = data & 0xff;
+            // printf("%02x%04x: set dp w %02x\n", mcu.cp, mcu.pc, data);
         }
         else if (reg == 4) // FIXME: undocumented
         {
+            // printf("fixme 4 %04x\n", data);
             mcu.ep = data & 0xff;
         }
         else if (reg == 3) // FIXME: undocumented
         {
+            // printf("fixme 5\n");
             mcu.br = data & 0xff;
+        }
+        else if (reg == 1) // FIXME: undocumented
+        {
+            // printf("fixme 6\n");
+            mcu.sr = data;
         }
         else
         {
@@ -287,6 +300,7 @@ inline void MCU_ControlRegisterWrite(uint32_t reg, uint32_t siz, uint32_t data)
         else if (reg == 5)
         {
             mcu.dp = data;
+            // printf("%02x%04x: set dp b %02x\n", mcu.cp, mcu.pc, mcu.dp);
         }
         else if (reg == 7)
         {
@@ -306,19 +320,28 @@ inline uint32_t MCU_ControlRegisterRead(uint32_t reg, uint32_t siz)
     {
         if (reg == 0)
         {
+            // printf("fixme 7\n");
             ret = mcu.sr & sr_mask;
         }
         else if (reg == 5) // FIXME: undocumented
         {
+            // printf("fixme 8 %02x\n", mcu.dp);
             ret = mcu.dp | (mcu.dp << 8);
         }
         else if (reg == 4) // FIXME: undocumented
         {
+            // printf("fixme 9\n");
             ret = mcu.ep | (mcu.ep << 8);
         }
         else if (reg == 3) // FIXME: undocumented
         {
-            ret = mcu.br | (mcu.br << 8);;
+            // printf("fixme 10\n");
+            ret = mcu.br | (mcu.br << 8);
+        }
+        else if (reg == 1) // FIXME: undocumented
+        {
+            // printf("fixme 11\n");
+            ret = mcu.sr;
         }
         else
         {
@@ -378,7 +401,7 @@ inline uint16_t MCU_PopStack(void)
     uint16_t ret;
     if (mcu.r[7] & 1)
         MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
-    ret = MCU_Read16(mcu.tp << 16 | mcu.r[7]);
+    ret = MCU_Read16(mcu.tp << 16 | mcu.r[7], true);
     mcu.r[7] += 2;
     return ret;
 }
@@ -530,13 +553,15 @@ enum {
     // MCU_RA30_STYLESELECT_L = 39,
 
     // SE70
-    MCU_SE70_CONTROL = 0,
-    MCU_SE70_UTILITY = 1,
-    MCU_SE70_PARAM_R = 2,
-    MCU_SE70_PARAM_L = 3,
-    MCU_SE70_WRITE = 4,
-    MCU_SE70_EXIT = 5,
-    MCU_SE70_ENTER = 6,
+    MCU_SE70_CONTROL2 = 0,
+    MCU_SE70_CONTROL3 = 1,
+    MCU_SE70_CONTROL1 = 2,
+    MCU_SE70_UTILITY = 3,
+    MCU_SE70_PARAM_R = 4,
+    MCU_SE70_PARAM_L = 5,
+    MCU_SE70_WRITE = 6,
+    MCU_SE70_EXIT = 7,
+    MCU_SE70_ENTER = 8,
 };
 
 
@@ -553,11 +578,13 @@ enum {
     ROM_SET_RD500,
     ROM_SET_SC88,
     ROM_SET_SC88VL,
+    ROM_SET_SC88PRO,
     ROM_SET_XP10,
     ROM_SET_RA30,
     ROM_SET_SY99,
     ROM_SET_SE70,
     ROM_SET_JD800,
+    ROM_SET_JD990,
     ROM_SET_COUNT
 };
 
@@ -575,14 +602,18 @@ extern int mcu_rd500;
 extern int mcu_ra30;
 extern int mcu_sc88;
 extern int mcu_sc88vl;
+extern int mcu_sc88pro;
 extern int mcu_xp10;
 extern int mcu_sy99;
 extern int mcu_se70;
 extern int mcu_jd800;
+extern int mcu_jd990;
 
 extern int mcu_h8_510;
+extern int mcu_h8_570;
 
 extern SDL_atomic_t mcu_button_pressed;
+extern bool jd800_btn_down[0x100];
 
 static const uint32_t uart_buffer_size = 8192;
 extern uint32_t uart_write_ptr;

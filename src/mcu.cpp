@@ -33,6 +33,10 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <errno.h>
 #define SDL_MAIN_HANDLED
 #include "SDL.h"
 #include "mcu.h"
@@ -50,6 +54,63 @@
 #include <unistd.h>
 #include <limits.h>
 #endif
+
+int serial_fd;
+
+static int open_serial(const char *path) {
+    int fd = open(path, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0) {
+        perror("open serial");
+        return -1;
+    }
+
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0) {
+        perror("tcgetattr");
+        close(fd);
+        return -1;
+    }
+
+    // configure raw mode
+    cfmakeraw(&tty);
+
+    // set baud rate (match your arduino sketch)
+    cfsetspeed(&tty, B115200);
+
+    tty.c_cflag |= (CLOCAL | CREAD);  // ignore modem control lines, enable receiver
+    tty.c_cc[VMIN]  = 1;              // wait for at least 1 byte
+    tty.c_cc[VTIME] = 5;              // timeout: 0.5s
+
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        perror("tcsetattr");
+        close(fd);
+        return -1;
+    }
+
+    return fd;
+}
+
+static uint8_t read_byte(int fd) {
+  uint8_t b;
+  int n = read(fd, &b, 1);
+  if (n != 1) {
+      perror("read");
+      return 0xFF; // or throw
+  }
+  return b;
+}
+
+static void write_bytes(int fd, const uint8_t *data, size_t len) {
+  size_t total = 0;
+  while (total < len) {
+      ssize_t n = write(fd, data + total, len - total);
+      if (n < 0) {
+          perror("write");
+          break;
+      }
+      total += n;
+  }
+}
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
@@ -76,11 +137,13 @@ const char* rs_name[ROM_SET_COUNT] = {
     "RD-500",
     "SC-88",
     "SC-88VL",
+    "SC-88pro",
     "XP-10",
     "RA-30",
     "SY-99",
     "SE-70",
-    "JD-800"
+    "JD-800",
+    "JD-990"
 };
 
 static const int ROM_SET_N_FILES = 6;
@@ -172,6 +235,13 @@ const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
     "PCM_IC_328.bin", // FIXME
 
     "",
+    "roland_sc-88pro_eprom_dump/R01129456-LH538UOL-byteswap.bin",
+    "PCM_IC_325.bin", // FIXME
+    "PCM_IC_326.bin", // FIXME
+    "PCM_IC_327.bin", // FIXME
+    "PCM_IC_328.bin", // FIXME
+
+    "",
     "Roland_XP-10_Ver1.02_96-10-11.bin",
     "jv880_waverom1.bin", // FIXME
     "jv880_waverom2.bin", // FIXME
@@ -200,7 +270,15 @@ const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
     "",
     
     "jd800_internal.bin",
-    "roland_jd800_program_v1_01.bin",
+    // "roland_jd800_program_v1_01.bin",
+    "JD800 V1.02.BIN",
+    "roland_jd800_waverom1.bin",
+    "roland_jd800_waverom2.bin",
+    "roland_jd800_waverom3.bin",
+    "",
+    
+    "",
+    "JD-990_1.04.bin",
     "",
     "",
     "",
@@ -210,9 +288,9 @@ const char* roms[ROM_SET_COUNT][ROM_SET_N_FILES] =
 int romset = ROM_SET_MK2;
 
 static const int ROM1_SIZE = 0x8000;
-static const int ROM2_SIZE = 0x80000;
+static const int ROM2_SIZE = 0x100000;
 static const int STYLE_ROM_SIZE = 0x80000; // RA30 only
-static const int RAM_SIZE = 0x400;
+static const int RAM_SIZE = 0x800;
 static const int SRAM_SIZE = 0x10000;
 static const int NVRAM_SIZE = 0x8000; // JV880 only
 static const int CARDRAM_SIZE = 0x8000; // JV880 only
@@ -244,13 +322,16 @@ int mcu_sc155 = 0; // 0 - SC-55(MK2), 1 - SC-155(MK2)
 int mcu_rd500 = 0; // 0 - SC-55, 1 - RD-500
 int mcu_sc88 = 0; // 0 - SC-55(MK2), 1 - SC-88
 int mcu_sc88vl = 0; // 0 - SC-55(MK2), 1 - SC-88VL
+int mcu_sc88pro = 0; // 0 - SC-55(MK2), 1 - SC-88pro
 int mcu_xp10 = 0; // 0 - SC-55(MK2), 1 - XP-10
 int mcu_ra30 = 0; // 0 - SC-55(MK2), 1 - RA-30
 int mcu_sy99 = 0; // 0 - SC-55(MK2), 1 - SY-99
 int mcu_se70 = 0; // 0 - SC-55(MK2), 1 - SE-70
 int mcu_jd800 = 0; // 0 - SC-55(MK2), 1 - JD-800
+int mcu_jd990 = 0; // 0 - SC-55(MK2), 1 - JD-990
 
 int mcu_h8_510 = 0; // 0 - H8/532, 1 - H8/510
+int mcu_h8_570 = 0; // 0 - H8/532, 1 - H8/570
 
 static int ga_int[8];
 static int ga_int_enable = 0;
@@ -272,6 +353,9 @@ bool initial = true;
 // SDL_atomic_t mcu_button_pressed = { 1 << MCU_BUTTON_MIDI_CH_L | 1 << MCU_BUTTON_MIDI_CH_R };
 // SDL_atomic_t mcu_button_pressed = { 1 << MCU_BUTTON_KEY_SHIFT_L | 1 << MCU_BUTTON_KEY_SHIFT_R };
 SDL_atomic_t mcu_button_pressed = { 0 };
+bool jd800_btn_down[0x100] = { 0 };
+bool jd800_btn_down_status[0x100] = { 0 };
+uint8_t jd800_btn_todo = 0;
 
 uint8_t RCU_Read(void)
 {
@@ -306,7 +390,7 @@ uint16_t MCU_AnalogReadPin(uint32_t pin)
 {
     if (mcu_cm300)
         return 0;
-    if (mcu_xp10 || mcu_ra30 || mcu_se70)
+    if (mcu_xp10 || mcu_ra30 || mcu_se70 || mcu_jd800)
         return ANALOG_LEVEL_BATTERY;
     if (mcu_jv880)
     {
@@ -314,7 +398,7 @@ uint16_t MCU_AnalogReadPin(uint32_t pin)
             return ANALOG_LEVEL_BATTERY;
         return 0x3ff;
     }
-    if (mcu_sc88)
+    if (mcu_sc88 || mcu_sc88pro)
     {
         if (pin == 0)
             return ANALOG_LEVEL_BATTERY;
@@ -900,14 +984,46 @@ uint8_t cardram[CARDRAM_SIZE];
 
 int rom2_mask = ROM2_SIZE - 1;
 
+struct EPVoice {
+    uint32_t addrStart;
+    uint32_t addrLoop;
+    uint32_t addrEnd;
+    uint32_t addrUnk0c;
+    uint16_t unk2c;
+    uint16_t unk30;
+    uint16_t flags;
+
+    uint32_t tvf_08;
+    uint32_t tvf_20;
+    uint16_t tvf_30;
+    uint16_t tvf_34;
+};
+EPVoice ep_voices[32];
+uint32_t ep_active_voices = 0;
+uint32_t ep_unk3e = 0;
+uint32_t tvf_active_voices = 0;
+
 uint8_t xp_temp[0x4000];
+uint8_t ep_temp[0x80];
+uint8_t tvf_temp[0x80];
+uint32_t dsp_temp[0x4000];
 uint8_t csp_temp[0x4000];
+uint8_t csp_temp2[0x4000];
+uint8_t csp_regs[4];
+uint32_t lsp_temp[0x200] = {0};
+uint8_t lsp_regs[16] = {0};
+
+uint16_t isp_dr[32] = {0};
 
 uint8_t pccsr = 0x00;
 uint8_t dp_ram[16] = {0};
-uint8_t dsp_ram[0x1000] = {0};
+uint8_t mixer_reg[0x20] = {0};
 
-uint8_t MCU_Read(uint32_t address)
+uint8_t isp_isfl = 0x00;
+
+bool shouldLog = false;
+
+uint8_t MCU_Read(uint32_t address, bool code)
 {
     uint32_t address_full = address;
     uint32_t address_rom = address & 0x3ffff;
@@ -918,7 +1034,71 @@ uint8_t MCU_Read(uint32_t address)
     address &= 0xffff;
     uint8_t ret = 0xff;
 
-    if (mcu_rd500)
+    if (mcu_jd990)
+    {
+        if (page == 0)
+        {
+                 if (address == 0xfe91) { printf("%02x%04x: read  dev P6DR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfe94) { printf("%02x%04x: read  dev P9DR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfe96) { printf("%02x%04x: read  dev P11DR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfe9a) { printf("%02x%04x: read  dev SCI SCR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfe9d) { printf("%02x%04x: read  dev SCI RDR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfea0) { printf("%02x%04x: read  dev PWM TCR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfea1) { printf("%02x%04x: read  dev PWM TSR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfeb0) { printf("%02x%04x: read  dev ISP ISFH\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfeb1) { printf("%02x%04x: read  dev ISP ISFL\n", mcu.cp, mcu.pc); ret = isp_isfl;}
+            else if (address == 0xfeb7) { printf("%02x%04x: read  dev ISP ICFL\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xfeb9) { printf("%02x%04x: read  dev ISP IEFL\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address == 0xff19) { printf("%02x%04x: read  dev ISP ICSR\n", mcu.cp, mcu.pc); ret = 0x00;}
+            else if (address >= 0xfec0 && address < 0xff00) {
+                printf("%02x%04x: read  dev ISP DR%d\n", mcu.cp, mcu.pc, (address - 0xfec0) / 2);
+                ret = isp_dr[(address - 0xfec0) / 2] >> ((address & 1) * 8);
+            }
+            else if (address < 0x8000)
+                ret = rom2[address];
+            else if (address >= 0xf680 && address < 0xfe80)
+                ret = ram[(address - 0xf680) & 0x7ff];
+            else if (address >= 0x8000 && address < 0xf680)
+                ret = sram[(address & 0x7fff) | 0x8000];
+            else {
+                printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+            }
+        }
+        else if (page <= 0x7) {
+            ret = rom2[address_full & rom2_mask];
+        }
+        else if (page == 0x8) {
+            ret = sram[address & 0xffff];
+        }
+        else if (page == 0xe && address >= 0x0000 && address < 0x4000) {
+            printf("%02x%04x: read  ep %04x\n", mcu.cp, mcu.pc, address & 0x3fff);
+            ret = 0x00;
+        }
+        else if (page == 0xe && address >= 0x4000 && address < 0x8000) {
+            printf("%02x%04x: read  unk e4 %04x\n", mcu.cp, mcu.pc, address & 0x3fff);
+            ret = 0x00;
+        }
+        else if (page == 0xe && address >= 0x8000) {
+            printf("%02x%04x: read  unk e8 %04x\n", mcu.cp, mcu.pc, address & 0x3fff);
+            ret = 0x00;
+        }
+        else if (page == 0xf && address < 0x4000) { // CSP1
+            ret = 0x00;
+        }
+        else if (page == 0xf && address < 0x8000) { // CSP2
+            ret = 0x00;
+        }
+        else if (page == 0xf && address >= 0xa000 && address < 0xa003) {
+            printf("%02x%04x: read  lcd %x\n", mcu.cp, mcu.pc, address & 0x3);
+            ret = 0x00;
+        }
+        else {
+            printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+        }
+        return ret;
+    }
+
+    else if (mcu_rd500)
     {
         if (page == 0)
         {
@@ -1066,6 +1246,133 @@ uint8_t MCU_Read(uint32_t address)
         return ret;
     }
 
+    else if (mcu_sc88pro)
+    {
+        if (address == 0xfe87) // P4DR
+            return 0x00;
+        else if (address_full >= 0xfe80 && address_full <= 0xff1f)
+            return MCU_DeviceRead_510(address);
+        else if (address_full < 0x800000)
+        {
+            // if ((address_full & 0xfffff) >= 0x0f0000
+            //     && mcu.pc != 0x649f // 0c649f: read name from 0x0fe000
+            //     && mcu.pc != 0x7fad // 0c7fad: read ?? from 0fe3d4-0fe3d5
+            //     && mcu.pc != 0x7fb3 // 0c7fb3: read ?? from 0fe492
+            //     && mcu.pc != 0x9752 // load rom prg
+            //     && mcu.pc != 0x9756
+            //     && mcu.pc != 0x975a
+            //     && mcu.pc != 0x9275 // load ram clean
+            //     && mcu.pc != 0x927d
+            //     && mcu.pc != 0x926d
+            // ) {
+                // }
+            // if (shouldLog && !code
+            //     // && !(mcu.cp == 0xc && (
+            //     //     mcu.pc == 0x4b4d || mcu.pc == 0x4c65 || mcu.pc == 0x4c69 || mcu.pc == 0x4c6f || mcu.pc == 0x4c73 ||
+            //     //     mcu.pc == 0x4d81 || mcu.pc == 0x4eab || mcu.pc == 0x4f25 || mcu.pc == 0x606d || mcu.pc == 0x6084 ||
+            //     //     mcu.pc == 0x6892 || mcu.pc == 0x6f45 || mcu.pc == 0x7fec || mcu.pc == 0x8efc || mcu.pc == 0xb884 ||
+            //     //     mcu.pc == 0xb898 || mcu.pc == 0xb8b4 || mcu.pc == 0xb8cc || mcu.pc == 0xb8df || mcu.pc == 0xb8e1 ||
+            //     //     mcu.pc == 0xbbf3 || mcu.pc == 0xbbfb || mcu.pc == 0xbc0a || mcu.pc == 0xbc3a || mcu.pc == 0xbc44 ||
+            //     //     mcu.pc == 0x649f || mcu.pc == 0x69da || mcu.pc == 0x6ce5 || mcu.pc == 0x6d18 || mcu.pc == 0x7fad ||
+            //     //     mcu.pc == 0x7fb3 || mcu.pc == 0x7fc0 || mcu.pc == 0x7fcc || mcu.pc == 0x8ee2 || mcu.pc == 0x97e0 ))
+            //     // && !(mcu.cp == 0xd && mcu.pc == 0x856d)
+            //     && !(address_full >= 0x60000 && address_full < 0xc3000) // sound data
+            //     && !(address_full >= 0xd83fc && address_full < 0xd879f) // lcd stuff
+            //     && !(address_full >= 0xd8ea0 && address_full < 0xde520) // string table
+            //     && !(address_full >= 0xfe000 && address_full < 0xfe34d) // effect names
+            //     && !(address_full >= 0xf0000 && address_full < 0xfe000) // dsp pgms
+            //     && !(address_full >= 0xee55a && address_full < 0xefe00) // ?? table
+            //     // 0ec020-0ec0df  ??
+            //     // 0e7b62-0e852b  ??
+            // ) {
+            //     printf("%02x%04x: read rom data %02x%04x = %02x\n", mcu.cp, mcu.pc, page, address, rom2[address_full & 0xfffff]);
+            // }
+
+            // if (!code && address_full >= 0xe0000
+            //     && !(address_full >= 0xf0000 && address_full < 0xfe000) // dsp pgms
+            //     && !(address_full >= 0xfe000 && address_full < 0xfe34d) // effect names
+            //     && !(address_full >= 0xfe34e && address_full < 0xfe3d0) // effect sysex numbers
+            //     && !(address_full >= 0xfe3d2 && address_full < 0xfe3f6) // pgm entry ptr table
+            //     && !(address_full >= 0xfe412 && address_full < 0xfe790) // pgm entry table
+            //     && !(address_full >= 0xfe792 && address_full < 0xfedc0) // default params table
+            // ) {
+            //     printf("%02x%04x: read rom data %02x%04x = %02x\n", mcu.cp, mcu.pc, page, address, rom2[address_full & 0xfffff]);
+            // }
+
+            // if (address_full == 0xd0100+0x3a)
+            //     return 0x01;
+            // if (address_full == 0xd0100+0x3b)
+            //     return 0x01;
+            
+            return rom2[address_full & 0xfffff];
+        }
+        else if (address_full < 0xc80000)
+        {
+            // if (shouldLog)
+            //     printf("%02x%04x: read sram %02x%04x = %02x\n", mcu.cp, mcu.pc, page, address, sram[address_full & 0xffff]);
+            
+            return sram[address_full & 0xffff];
+        }
+        else if (address_full >= 0xe00000 && address_full < 0xe7ffff)
+        {
+            // SUB CPU
+            if (address == 0x00c0) // Version H
+                ret = 0x01;
+            else if (address == 0x00c1)  // Version L
+                ret = 0x23;
+            else if (address == 0x00dc)
+            {
+                ret = midi_command;
+                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ2, 0);
+            }
+            else if (address == 0x00dd)
+                ret = midi_channel;
+            else if (address == 0x00de)
+                ret = midi_par1;
+            else if (address == 0x00df)
+                ret = midi_par2;
+            else if (address == 0x00fd) // IPC Semaphore
+                ret = 0x80;
+            else if (address == 0x00fe) // Buttons
+            {
+                uint8_t data = 0xff;
+                uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
+
+                if (io_sd == 0x1)
+                    data &= ((button_pressed >> 0) & 0xff) ^ 0xff;
+                if (io_sd == 0x2)
+                    data &= ((button_pressed >> 8) & 0xff) ^ 0xff;
+                if (io_sd == 0x4)
+                    data &= ((button_pressed >> 16) & 0xff) ^ 0xff;
+                if (io_sd == 0x8)
+                    data &= ((button_pressed >> 24) & 0xff) ^ 0xff;
+
+                ret = data;
+            }
+            return ret;
+        }
+        else if (address_full >= 0xe80000 && address_full < 0xf00000)
+        {
+            // GA
+            if (address == 0xc104) // IRQ
+            {
+                ret = ga_int_trigger;
+                ga_int_trigger = 0;
+                MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 0);
+            }
+            return ret;
+        }
+        else if (address_full >= 0xf00000 && address_full < 0xf80000)
+        {
+            // LSP
+            // printf("%02x%04x: read lsp %02x%04x\n", mcu.cp, mcu.pc, page, address);
+            return 0x00;
+        }
+        else
+            printf("%02x%04x: read %02x%04x\n", mcu.cp, mcu.pc, page, address);
+        return 0xff;
+    }
+
     else if (mcu_xp10)
     {
         if (page == 0)
@@ -1181,13 +1488,15 @@ uint8_t MCU_Read(uint32_t address)
             {
                 // Buttons
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
-                ret = (~(button_pressed & 0b111111) << 2) | (0b11 << 0);
+                ret = ~(button_pressed & 0b11111111);
+                // printf("r btn %08x %02x\n", button_pressed, ret);
             }
             else if (address == 0xfe8b)
             {
                 // Encoder button
                 uint32_t button_pressed = (uint32_t)SDL_AtomicGet(&mcu_button_pressed);
-                ret = 0b11111110 | ~(button_pressed >> 6);
+                ret = ~(button_pressed >> 8) & 1;
+                // printf("r btn %08x %02x\n", button_pressed, ret);
             }
             else if (address == 0xfe8e) printf("r P7DR\n");
             else if (address == 0xfe8f) printf("r P8DR\n");
@@ -1197,15 +1506,33 @@ uint8_t MCU_Read(uint32_t address)
                 ret = sram[address & 0x7fff];
             else if (address >= 0x8000)
             {
-                printf("%02x%04x: read CSP %04x\n", mcu.cp, mcu.pc, address & 0x3fff);
-                ret = csp_temp[address & 0x3fff];
+                // printf("%02x%04x: read CSP %04x\n", mcu.cp, mcu.pc, address & 0x3fff);
+                // ret = csp_regs[address & 0x3];
 
-                // if (address == 0x8000 && mcu.pc != 0x1e4a)
-                //     ret = 0x7f;
-                if (address == 0x8000)
+                // if (address == 0x8000)
+                //     ret = 0x01;
+
+                // uint8_t buf[4] = {0};
+                // buf[0] = 'r';
+                // buf[1] = (address >> 8) & 0xff;
+                // buf[2] = address & 0xff;
+                // buf[3] = 0x00;
+                // write_bytes(serial_fd, buf, 4);
+                // ret = read_byte(serial_fd);
+                
+                // ret = 0xff;
+                ret = csp_regs[address & 0x3];
+                if (address == 0x8000) {
                     ret = 0b01;
-                if (address == 0x8001 || address == 0x8002 || address == 0x8003)
-                    ret = 0b00;
+                } else {
+                    ret = 0x34;
+                }
+                // if (address == 0x8002)
+                //     ret = 0xfc;
+                // if (address == 0x8003)
+                //     ret = 0x01;
+
+                // printf("%02x%04x: read CSP %04x = %02x\n", mcu.cp, mcu.pc, address & 0x3fff, ret);
             }
             else
                 printf("%02x%04x: read  %02x%04x\n", mcu.cp, mcu.pc, page, address);
@@ -1238,26 +1565,130 @@ uint8_t MCU_Read(uint32_t address)
                 ret = ram[(address - 0xfb80) & 0x3ff];
             else if (address == 0xf106)
             {
-                printf("read f106\n");
                 ret = ga_int_trigger;
                 ga_int_trigger = 0;
                 MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, 0);
             }
             else if (address >= 0x8000 && address < 0xa000)
                 ret = sram[address & 0x7fff];
-            else if (address == 0xa000)
+            else if (address == 0xa000) {
                 ret = pccsr;
-            else if (address >= 0xe000 && address < 0xefff) {
-                ret = dsp_ram[address];
+                pccsr = !pccsr; // hack
                 // ret = 0x00;
-                printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+                // printf("%02x%04x: h8  read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+            }
+            else if (address >= 0xa001 && address < 0xa020) {
+                // ret = dp_ram[address - 0xa001];
+                if (address == 0xa001) {
+                    ret = 0x02;
+                }
+                else if (address == 0xa002) {
+                    // ret = 0xb8;
+                    
+                    if (jd800_btn_down_status[jd800_btn_todo])
+                        ret = 0xb8;
+                    else
+                        ret = 0xbf;
+                    
+                        // ret = rand() & 0xff;
+                    // printf("h8 02 %02x\n", ret);
+                }
+                else if (address == 0xa003) {
+                    // ret = 0x19;
+                    // ret = rand() & 0xff;
+                    // ret = button_pressed & 0xff;
+                    // ret = button_pressed > 0 ? 0x22 : 00;
+
+                    if (jd800_btn_down_status[jd800_btn_todo])
+                        ret = jd800_btn_todo;
+                    else
+                        ret = jd800_btn_todo;
+                        // ret = 0x00;
+                }
+                else {
+                    ret = 0x00;
+                }
+
+                // printf("%02x%04x: h8  read  %x%04x = %02x\n", mcu.cp, mcu.pc, page, address, ret);
+            }
+            else if (address >= 0xb000 && address < 0xbfff) {
+                // printf("%02x%04x: ep  read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+                
+                if (address == 0xb007)
+                {
+                    // Waverom read
+                    uint32_t addr = ep_temp[0x3e] | ep_temp[0x3d] << 8 | ep_temp[0x3c] << 16;
+                    if ((addr >> 21) == 0x00) {
+                        ret = waverom1[addr & 0xfffff];
+                        // printf("waverom1 read %08x=%02x %c\n", addr, ret, ret);
+                    }
+                    else if ((addr >> 21) == 0x01) {
+                        ret = waverom2[addr & 0xfffff];
+                        // printf("waverom2 read %08x=%02x %c\n", addr, ret, ret);
+                    }
+                    else if ((addr >> 21) == 0x02) {
+                        ret = 0xff; // card
+                        // printf("waverom card read %08x=%02x %c\n", addr, ret, ret);
+                    }
+                    else if ((addr >> 21) == 0x03) {
+                        ret = waverom3[addr & 0xfffff];
+                        // printf("waverom3 read %08x=%02x %c\n", addr, ret, ret);
+                    }
+                    else {
+                        ret = 0x00;
+                        // printf("waverom invalid read %08x=%02x %c\n", addr, ret, ret);
+                    }
+                    // printf("waverom read %08x\n", addr);
+                }
+                else if (address == 0xb00b)
+                {
+                    printf("%02x%04x: ep  read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+
+                    // Int voice
+                    // static int ep_voice_tmp = 0;
+                    // ret = ep_voice_tmp++;
+                    // if (ep_voice_tmp == 24)
+                    //     ep_voice_tmp = 0;
+
+                    ret = 0x00;
+                }
+                else
+                    printf("%02x%04x: ep  read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+                
+            }
+            else if (address >= 0xc000 && address < 0xcfff) {
+                // printf("%02x%04x: key read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+                ret = 0x00;
+            }
+            else if (address >= 0xd000 && address < 0xdfff) {
+                printf("%02x%04x: tvf read  %x%04x\n", mcu.cp, mcu.pc, page, address);
+                ret = 0x00;
+            }
+            else if (address >= 0xe000 && address < 0xefff) {
+                // ret = mixer_reg[address];
+
+                uint16_t subaddr = address & 0xff;
+                if (subaddr == 0x17)
+                    ret = 0x00; // status?
+                else if (subaddr == 0x0)
+                    ret = 0x00;
+                else if (subaddr == 0x1)
+                    ret = 0x00;
+                else if (subaddr == 0x2)
+                    ret = 0x00;
+                else if (subaddr == 0x3)
+                    ret = 0x00;
+                else
+                    printf("%02x%04x: mix read  %x%04x\n", mcu.cp, mcu.pc, page, address);
             }
             else {
                 printf("%02x%04x: read  %x%04x\n", mcu.cp, mcu.pc, page, address);
             }
         }
         else if (page <= 0x4)
-            ret = rom2[address_rom & rom2_mask];
+            ret = rom2[address_full & 0x3ffff];
+        else if (page == 0xc)
+            ret = nvram[address & 0x7fff];
         else if (page == 0xd)
             ret = sram[address & 0x7fff];
         else
@@ -1440,23 +1871,23 @@ uint8_t MCU_Read(uint32_t address)
     return ret;
 }
 
-uint16_t MCU_Read16(uint32_t address)
+uint16_t MCU_Read16(uint32_t address, bool code)
 {
     address &= ~1;
     uint8_t b0, b1;
-    b0 = MCU_Read(address);
-    b1 = MCU_Read(address+1);
+    b0 = MCU_Read(address, code);
+    b1 = MCU_Read(address+1, code);
     return (b0 << 8) + b1;
 }
 
-uint32_t MCU_Read32(uint32_t address)
+uint32_t MCU_Read32(uint32_t address, bool code)
 {
     address &= ~3;
     uint8_t b0, b1, b2, b3;
-    b0 = MCU_Read(address);
-    b1 = MCU_Read(address+1);
-    b2 = MCU_Read(address+2);
-    b3 = MCU_Read(address+3);
+    b0 = MCU_Read(address, code);
+    b1 = MCU_Read(address+1, code);
+    b2 = MCU_Read(address+2, code);
+    b3 = MCU_Read(address+3, code);
     return (b0 << 24) + (b1 << 16) + (b2 << 8) + b3;
 }
 
@@ -1476,13 +1907,324 @@ unsigned int swapByteOrder(unsigned int ui)
          (ui << 24);
 }
 
+void saveState()
+{
+    MCU_WorkThread_Lock();
+    FILE *fstate = fopen("state.bin", "wb");
+    if (fstate == NULL) {
+        printf("Failed to open state file for writing.\n");
+        return;
+    }
+
+    fwrite(&mcu, sizeof(mcu), 1, fstate);
+    fwrite(sram, sizeof(sram), 1, fstate);
+    fwrite(dev_register, sizeof(dev_register), 1, fstate);
+    fwrite(&dev_IRQCR, sizeof(dev_IRQCR), 1, fstate);
+    fwrite(lsp_temp, sizeof(lsp_temp), 1, fstate);
+    fwrite(ga_int, sizeof(ga_int), 1, fstate);
+    fwrite(&ga_int_enable, sizeof(ga_int_enable), 1, fstate);
+    fwrite(&ga_int_trigger, sizeof(ga_int_trigger), 1, fstate);
+    fwrite(&ga_lcd_counter, sizeof(ga_lcd_counter), 1, fstate);
+    fwrite(&adf_rd, sizeof(adf_rd), 1, fstate);
+    fwrite(&analog_end_time, sizeof(analog_end_time), 1, fstate);
+    fwrite(&ssr_rd, sizeof(ssr_rd), 1, fstate);
+    fwrite(&uart_write_ptr, sizeof(uart_write_ptr), 1, fstate);
+    fwrite(&uart_read_ptr, sizeof(uart_read_ptr), 1, fstate);
+    fwrite(uart_buffer, sizeof(uart_buffer), 1, fstate);
+    fwrite(&midi_command, sizeof(midi_command), 1, fstate);
+    fwrite(&midi_par1, sizeof(midi_par1), 1, fstate);
+    fwrite(&midi_par2, sizeof(midi_par2), 1, fstate);
+    fwrite(&midi_channel, sizeof(midi_channel), 1, fstate);
+    fwrite(&midi_stage, sizeof(midi_stage), 1, fstate);
+    fwrite(&uart_rx_byte, sizeof(uart_rx_byte), 1, fstate);
+    fwrite(&uart_rx_delay, sizeof(uart_rx_delay), 1, fstate);
+    fwrite(&uart_tx_delay, sizeof(uart_tx_delay), 1, fstate);
+    fwrite(&encoder_int_delay, sizeof(encoder_int_delay), 1, fstate);
+    fwrite(&lcd_delay, sizeof(lcd_delay), 1, fstate);
+    fwrite(&lcd_ready, sizeof(lcd_ready), 1, fstate);
+    fwrite(&timer_cycles, sizeof(timer_cycles), 1, fstate);
+    fwrite(&timer_tempreg, sizeof(timer_tempreg), 1, fstate);
+    fwrite(frt, sizeof(frt), 1, fstate);
+    fwrite(&timer, sizeof(timer), 1, fstate);
+    fwrite(&dev_WDT_TCSR, sizeof(dev_WDT_TCSR), 1, fstate);
+    fwrite(&dev_WDT_TCNT, sizeof(dev_WDT_TCNT), 1, fstate);
+
+    fclose(fstate);
+    MCU_WorkThread_Unlock();
+}
+
+void loadState(const char* path)
+{
+    MCU_WorkThread_Lock();
+    FILE *fstate = fopen(path, "rb");
+    if (fstate == NULL) {
+        printf("Failed to open state file for reading.\n");
+        return;
+    }
+
+    fread(&mcu, sizeof(mcu), 1, fstate);
+    fread(sram, sizeof(sram), 1, fstate);
+    fread(dev_register, sizeof(dev_register), 1, fstate);
+    fread(&dev_IRQCR, sizeof(dev_IRQCR), 1, fstate);
+    fread(lsp_temp, sizeof(lsp_temp), 1, fstate);
+    fread(ga_int, sizeof(ga_int), 1, fstate);
+    fread(&ga_int_enable, sizeof(ga_int_enable), 1, fstate);
+    fread(&ga_int_trigger, sizeof(ga_int_trigger), 1, fstate);
+    fread(&ga_lcd_counter, sizeof(ga_lcd_counter), 1, fstate);
+    fread(&adf_rd, sizeof(adf_rd), 1, fstate);
+    fread(&analog_end_time, sizeof(analog_end_time), 1, fstate);
+    fread(&ssr_rd, sizeof(ssr_rd), 1, fstate);
+    fread(&uart_write_ptr, sizeof(uart_write_ptr), 1, fstate);
+    fread(&uart_read_ptr, sizeof(uart_read_ptr), 1, fstate);
+    fread(uart_buffer, sizeof(uart_buffer), 1, fstate);
+    fread(&midi_command, sizeof(midi_command), 1, fstate);
+    fread(&midi_par1, sizeof(midi_par1), 1, fstate);
+    fread(&midi_par2, sizeof(midi_par2), 1, fstate);
+    fread(&midi_channel, sizeof(midi_channel), 1, fstate);
+    fread(&midi_stage, sizeof(midi_stage), 1, fstate);
+    fread(&uart_rx_byte, sizeof(uart_rx_byte), 1, fstate);
+    fread(&uart_rx_delay, sizeof(uart_rx_delay), 1, fstate);
+    fread(&uart_tx_delay, sizeof(uart_tx_delay), 1, fstate);
+    fread(&encoder_int_delay, sizeof(encoder_int_delay), 1, fstate);
+    fread(&lcd_delay, sizeof(lcd_delay), 1, fstate);
+    fread(&lcd_ready, sizeof(lcd_ready), 1, fstate);
+    fread(&timer_cycles, sizeof(timer_cycles), 1, fstate);
+    fread(&timer_tempreg, sizeof(timer_tempreg), 1, fstate);
+    fread(frt, sizeof(frt), 1, fstate);
+    fread(&timer, sizeof(timer), 1, fstate);
+    fread(&dev_WDT_TCSR, sizeof(dev_WDT_TCSR), 1, fstate);
+    fread(&dev_WDT_TCNT, sizeof(dev_WDT_TCNT), 1, fstate);
+
+    fclose(fstate);
+    MCU_WorkThread_Unlock();
+}
+
+void saveLSP()
+{
+    // FILE *fsram_bin = fopen("sram.txt", "w");
+    // for (int i = 0; i < 0x10000; i+= 8) {
+    //     fprintf(fsram_bin, "%04x: %02x %02x %02x %02x %02x %02x %02x %02x\n", i, sram[i+0], sram[i+1], sram[i+2], sram[i+3], sram[i+4], sram[i+5], sram[i+6], sram[i+7]);
+    // }
+    // fclose(fsram_bin);
+
+
+    // FILE *flsp = fopen("lsp.txt", "w");
+    // // FILE *flsp = fopen("lsp_pgm/lsp.txt", "w");
+    // for (int i = 0x80; i < 0x200; i++)
+    // {
+    //     // fprintf(flsp, "%02x %02x %02x\n", lsp_temp[i] & 0xff, (lsp_temp[i] >> 8) & 0xff, (lsp_temp[i] >> 16) & 0xff);
+
+    //     // if (lsp_temp[i] == 0x00)
+    //     {
+    //         fprintf(flsp, "%04x: %02x %02x %02x\n",
+    //             i, lsp_temp[i] & 0xff, (lsp_temp[i] >> 8) & 0xff, (lsp_temp[i] >> 16) & 0xff
+    //         );
+    //     }
+    //     // else
+    //     // {
+    //     //     fprintf(flsp, "%04x: %02x %02x %02x  // opcode:%02x write:%02x eram:%x reg:%02x\n",
+    //     //         i, lsp_temp[i] & 0xff, (lsp_temp[i] >> 8) & 0xff, (lsp_temp[i] >> 16) & 0xff,
+    //     //         lsp_temp[i] & 0xe0, lsp_temp[i] & 0x18, lsp_temp[i] & 0x7, (lsp_temp[i] >> 8) & 0x7f
+    //     //     );
+    //     // }
+    // }
+    // fclose(flsp);
+
+    // char name_tmp[128] = {0};
+    // memcpy(name_tmp, "lsp_pgm/", 8);
+    // memcpy(name_tmp + 0x8, &LCD_Data[3], 0xd + 0x3);
+    // memcpy(name_tmp + 0x8 + 0xd + 0x3, ".bin", 5);
+    // for (size_t i = 8; i < 128; i++)
+    //     if (name_tmp[i] == '/')
+    //         name_tmp[i] = '_';
+    // FILE *flsp_bin = fopen(name_tmp, "wb");
+    // for (size_t i = 0; i < 384; i++)
+    // {
+    //     uint8_t value = lsp_temp[i+0x80] & 0xff;
+    //     fwrite(&value, 1, 1, flsp_bin);
+    //     value = (lsp_temp[i+0x80] >> 8) & 0xff;
+    //     fwrite(&value, 1, 1, flsp_bin);
+    //     value = (lsp_temp[i+0x80] >> 16) & 0xff;
+    //     fwrite(&value, 1, 1, flsp_bin);
+    // }
+    // fclose(flsp_bin);
+
+    // FILE *fsram = fopen("sram.txt", "w");
+    // for (int i = 0; i < 0x10000; i+= 8) {
+    //     fprintf(fsram, "%04x: %02x %02x %02x %02x %02x %02x %02x %02x\n", i, sram[i+0], sram[i+1], sram[i+2], sram[i+3], sram[i+4], sram[i+5], sram[i+6], sram[i+7]);
+    // }
+    // fclose(fsram);
+
+    // printf("pgm %d params", sram[0xcf6b]);
+    // for (int i = 0; i < 32; i++)
+    //     printf(" %02x", sram[0x4e88 + i]);
+    // printf("\n");
+
+    // FILE *fxp = fopen("xp.txt", "w");
+    // // fwrite(xp_temp, 1, 0x4000, fxp);
+    // for (int i = 0x00; i < 0x4000; i+=2) {
+    //     // fprintf(fxp, "%04x: %02x %02x %02x %02x\n", i, xp_temp[i+0], xp_temp[i+1], xp_temp[i+2], xp_temp[i+3]);
+    //     fprintf(fxp, "%04x: %02x %02x\n", i, xp_temp[i+0], xp_temp[i+1]);
+    // }
+    // fclose(fxp);
+
+    // FILE *fxp_bin = fopen("xp.bin", "wb");
+    // fwrite(xp_temp, 1, 0x4000, fxp_bin);
+    // fclose(fxp_bin);
+
+    // FILE *fcspb = fopen("csp.bin", "w");
+    // fwrite(csp_temp, 1, 0x4000, fcspb);
+    // fclose(fcspb);
+
+    // FILE *fcsp = fopen("csp.txt", "w");
+    // for (int i = 0x1000; i < 0x2000; i += 4) {
+    //     uint8_t dram_ctrl = csp_temp[i+1] >> 2;
+    //     uint8_t mac_shift = csp_temp[i+1] & 3;
+    //     uint8_t opcode = csp_temp[i+2] >> 4;
+    //     uint8_t store_dst = (csp_temp[i+2] >> 1) & 0x7;
+    //     uint16_t ram_offs = csp_temp[i+3] | ((csp_temp[i+2] & 1) << 8);
+    //     uint32_t base = (i - 0x1000) / 4;
+    //     uint16_t param = csp_temp[(base*2)+1] | (csp_temp[(base*2)+0] << 8);
+    //     fprintf(fcsp, "%04x: %02x %02x %02x   dram_ctrl:%02x  mac_shift:%x opcode:%x store:%x ram_offs:%03x param:%04x\n",
+    //         (i - 0x1000) / 4, csp_temp[i+1], csp_temp[i+2], csp_temp[i+3],
+    //         dram_ctrl, mac_shift, opcode, store_dst, ram_offs, param);
+    // }
+    // for (int i = 0x1000; i < 0x2000; i += 4) {
+    //     uint8_t dram_ctrl = csp_temp2[i+1] >> 2;
+    //     uint8_t mac_shift = csp_temp2[i+1] & 3;
+    //     uint8_t opcode = csp_temp2[i+2] >> 4;
+    //     uint8_t store_dst = (csp_temp2[i+2] >> 1) & 0x7;
+    //     uint16_t ram_offs = csp_temp2[i+3] | ((csp_temp2[i+2] & 1) << 8);
+    //     uint32_t base = (i - 0x1000) / 4;
+    //     uint16_t param = csp_temp2[(base*2)+1] | (csp_temp2[(base*2)+0] << 8);
+    //     fprintf(fcsp, "%04x: %02x %02x %02x   dram_ctrl:%02x  mac_shift:%x opcode:%x store:%x ram_offs:%03x param:%04x\n",
+    //         (i - 0x1000) / 4, csp_temp2[i+1], csp_temp2[i+2], csp_temp2[i+3],
+    //         dram_ctrl, mac_shift, opcode, store_dst, ram_offs, param);
+    // }
+    // fclose(fcsp);
+    
+    // FILE *fcspp = fopen("csp_program.txt", "w");
+    // for (int i = 0x1000; i < 0x4000; i+=4) {
+    //     fprintf(fcspp, "%04x: %02x %02x %02x\n", i, csp_temp[i+1], csp_temp[i+2], csp_temp[i+3]);
+    // }
+    // fclose(fcspp);
+
+    // FILE *fdsp_bin = fopen("dsp.bin", "wb");
+    // fwrite(dsp_temp, 4, 0x4000, fdsp_bin);
+    // fclose(fdsp_bin);
+
+    if (mcu_jd800) {
+        MCU_GA_SetGAInt(2, 0);
+        MCU_GA_SetGAInt(2, 1);
+    }
+    FILE *fsp = fopen("dsp_program.txt", "w");
+    for (int i = 0x0000; i < 0x4000; i+=1) {
+        fprintf(fsp, "%04x: %08x\n", i, dsp_temp[i]);
+    }
+    fclose(fsp);
+
+    // shouldLog = true;
+
+    // sram[0x5788 + 7 + 0] += 1;
+    // sram[0x5788 + 5] += 1;
+
+
+    // MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_ISF0, 1);
+    // printf("fired int\n");
+}
+
 void MCU_Write(uint32_t address, uint8_t value)
 {
+    uint32_t address_full = address;
     uint8_t page = address >> 16;
     if (!mcu_h8_510) page &= 0xf;
     address &= 0xffff;
 
-    if (mcu_rd500)
+    if (mcu_jd990)
+    {
+        if (page == 0x0)
+        {
+                 if (address == 0xfe88) { printf("%02x%04x: write dev ADCSR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfe91) { printf("%02x%04x: write dev P6DR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfe94) { printf("%02x%04x: write dev P9DR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfe96) { printf("%02x%04x: write dev P11DR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfe99) { printf("%02x%04x: write dev SCI BRR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfe9a) { printf("%02x%04x: write dev SCI SCR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfea0) { printf("%02x%04x: write dev PWM TCR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfea1) { printf("%02x%04x: write dev PWM TSR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfea6) { printf("%02x%04x: write dev PWM OCR0H %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfea7) { printf("%02x%04x: write dev PWM OCR0L %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfea8) { printf("%02x%04x: write dev PWM OCR1H %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfea9) { printf("%02x%04x: write dev PWM OCR1L %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeaa) { printf("%02x%04x: write dev PWM OCR2H %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeab) { printf("%02x%04x: write dev PWM OCR2L %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeac) { printf("%02x%04x: write dev PWM TMRH %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfead) { printf("%02x%04x: write dev PWM TMRL %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeb0) { printf("%02x%04x: write dev ISP ISFH %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeb1) { printf("%02x%04x: write dev ISP ISFL %02x\n", mcu.cp, mcu.pc, value); isp_isfl = value; }
+            else if (address == 0xfeb7) { printf("%02x%04x: write dev ISP ICFL %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeb8) { printf("%02x%04x: write dev ISP IEFH %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeb9) { printf("%02x%04x: write dev ISP IEFL %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfeba) { printf("%02x%04x: write dev ISP IOIEH %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfebb) { printf("%02x%04x: write dev ISP IOIEL %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfebc) { printf("%02x%04x: write dev ISP CLEH %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xfebd) { printf("%02x%04x: write dev ISP CLEL %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff18) { printf("%02x%04x: write dev ISP IPR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff19) { printf("%02x%04x: write dev ISP ICSR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff23) { printf("%02x%04x: write dev SYSCR8 %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff24) { printf("%02x%04x: write dev SYSCR9 %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff25) { printf("%02x%04x: write dev SYSCR10 %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff28) { printf("%02x%04x: write dev ISP FEDGE %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff29) { printf("%02x%04x: write dev ISP REDGE %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff2c) { printf("%02x%04x: write dev P1DDR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff30) { printf("%02x%04x: write dev P5DDR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff31) { printf("%02x%04x: write dev P6DDR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff33) { printf("%02x%04x: write dev P8DDR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff34) { printf("%02x%04x: write dev P9DDR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff35) { printf("%02x%04x: write dev P10DDR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff36) { printf("%02x%04x: write dev P11DDR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff40) { dev_register[DEV_IPRA] = value; }
+            else if (address == 0xff41) { dev_register[DEV_IPRB] = value; }
+            else if (address == 0xff42) { dev_register[DEV_IPRC] = value; }
+            else if (address == 0xff43) { dev_register[DEV_IPRD] = value; }
+            else if (address == 0xff48) { printf("%02x%04x: write dev WSC WCR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff49) { printf("%02x%04x: write dev RAMCR %02x\n", mcu.cp, mcu.pc, value); }
+            else if (address == 0xff4c) { printf("%02x%04x: write dev SYSCR1 %02x\n", mcu.cp, mcu.pc, value); }
+
+            else if (address >= 0xfec0 && address < 0xff00) {
+                printf("%02x%04x: write dev ISP DR%d %02x\n", mcu.cp, mcu.pc, (address - 0xfec0) / 2, value);
+                isp_dr[(address - 0xfec0) / 2] = value;
+            }
+            
+            else if (address >= 0xf680 && address < 0xfe80)
+                ram[(address - 0xf680) & 0x7ff] = value;
+            else if (address >= 0x8000 && address < 0xf680)
+                sram[(address & 0x7fff) | 0x8000] = value;
+            else
+                printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+        }
+        else if (page == 0x8)
+            sram[address & 0xffff] = value;
+        else if (page == 0xe && address >= 0x0000 && address < 0x4000)
+            printf("%02x%04x: write ep %04x %02x\n", mcu.cp, mcu.pc, address & 0x3fff, value);
+        else if (page == 0xe && address >= 0x4000 && address < 0x8000)
+            printf("%02x%04x: write unk e4 %04x %02x\n", mcu.cp, mcu.pc, address & 0x3fff, value);
+        else if (page == 0xe && address >= 0x8000)
+            printf("%02x%04x: write unk e8 %04x %02x\n", mcu.cp, mcu.pc, address & 0x3fff, value);
+        else if (page == 0xf && address >= 0x0000 && address < 0x4000)
+            csp_temp[address & 0x3fff] = value;
+        else if (page == 0xf && address >= 0x4000 && address < 0x8000)
+            csp_temp2[address & 0x3fff] = value;
+        else if (page == 0xf && address >= 0xa000 && address < 0xa003) {
+            printf("%02x%04x: write lcd %x %02x %c\n", mcu.cp, mcu.pc, address & 0x3, value, value);
+            // LCD_Write(address & 0x3, value);
+        }
+        else
+            printf("%02x%04x: write %x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
+        return;
+    }
+
+    else if (mcu_rd500)
     {
         if (page == 0)
         {
@@ -1872,6 +2614,112 @@ void MCU_Write(uint32_t address, uint8_t value)
         return;
     }
 
+    else if (mcu_sc88pro)
+    {
+        if (address == 0xfe87) // P4DR, contrast
+        { }
+        else if (address_full >= 0xfe80 && address_full <= 0xff1f)
+            MCU_DeviceWrite_510(address, value);
+        else if (address_full >= 0xc00000 && address_full < 0xc80000)
+        {
+            // if (shouldLog)
+            //     printf("%02x%04x: write sram %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+
+            sram[address_full & 0xffff] = value;
+        }
+        else if (address_full >= 0xe00000 && address_full < 0xe7ffff)
+        {
+            // SUB CPU
+            if (address <= 0xfd)
+                printf("%02x%04x: write-f %02x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
+            if (address == 0x00fe) // SM Port Write
+                io_sd = value;
+            else if (address == 0x00fd) // SM IPC Semaphore
+            { }
+            else if (address == 0x00ff) // SM Port control
+            { }
+        }
+        else if (address_full >= 0xe80000 && address_full < 0xefffff)
+        {
+            // GA
+            if (address == 0xc11f)
+            {
+                LCD_Write(0, value);
+                // printf("%02x%04x: write ga lcd %02x = %02x %c\n", mcu.cp, mcu.pc, address, value, value);
+                ga_lcd_counter = 1;
+            }
+            else if (address > 0xc11f)
+            {
+                LCD_Write(1, value);
+                // printf("%02x%04x: write ga lcd %02x = %02x %c\n", mcu.cp, mcu.pc, address, value, value);
+                ga_lcd_counter = 1;
+
+                if (initial)
+                {
+                    initial = false;
+                    SDL_AtomicSet(&mcu_button_pressed, 0);
+                }
+            }
+        }
+        else if (address_full >= 0xf00000 && address_full < 0xf80000)
+        {
+            // LSP
+            // printf("%02x%04x: write lsp %02x%04x = %02x\n", mcu.cp, mcu.pc, page, address, value);
+            lsp_regs[address & 0xf] = value;
+
+            if (address == 0x00) {
+                lsp_temp[(lsp_regs[0x01] << 8) | lsp_regs[0x00]] = (lsp_regs[0x02] << 16) | (lsp_regs[0x03] << 8) | lsp_regs[0x04];
+
+                // printf("%02x%04x: write lsp mem %03x = %02x %02x %02x\n", mcu.cp, mcu.pc, (lsp_regs[0x01] << 8) | lsp_regs[0x00], lsp_regs[0x02], lsp_regs[0x03], lsp_regs[0x04]);
+                
+                // int pgm_n = LCD_Data[4] - '0' + (LCD_Data[3] - '0') * 10;
+                // char tmp[64] = {0};
+                // memcpy(tmp, &LCD_Data[6], 13);
+                // printf("lsp pgm %02d param \"%s\" %03x = %02x %02x %02x\n", pgm_n, tmp, (lsp_regs[0x01] << 8) | lsp_regs[0x00], lsp_regs[0x04], lsp_regs[0x03], lsp_regs[0x02]);
+
+                // 0x5788+4: effect group (0:thru, 1:single, 2:serial, 3:rotary multi, 4:gtr multi, 5:key multi, 11:parallel, 40:all effects)
+                // 0x5788+5: effect type
+                // 0x5788+6: ??
+                // 0x5788+7: effect params[18]
+                // 0x5788+25: pan
+                // 0x5788+26: level
+
+                // printf("pgm %02d params", sram[0xcf6b]);
+                // for (int i = 0; i < 32; i++)
+                //     printf(" %02x", sram[0x5788 + i]);
+                // printf("\n");
+
+                // printf("group:%02x pgm:%02x level:%02x pan:%02x params", sram[0x5788+4], sram[0x5788+5], sram[0x5788+26], sram[0x5788+25]);
+                // for (int i = 0; i < 18; i++)
+                //     printf(" %02x", sram[0x5788 + 7 + i]);
+                // printf("\n");
+                
+                printf("lsp: %02x%02x", sram[0x5788+4], sram[0x5788+5]);
+                for (int i = 0; i < 21; i++)
+                    printf("%02x", sram[0x5788 + 6 + i]);
+                printf("\n");
+
+                // if (mcu.cp == 0x01 && mcu.pc == 0x9501 && ((lsp_regs[0x01] << 8) | lsp_regs[0x00]) == 0x1f8
+                //     && lsp_regs[0x02] == 0x7f && lsp_regs[0x03] == 0x75 && lsp_regs[0x04] == 0x08)
+                // {
+                //     FILE *f = fopen("lsp_dump.bin", "wb");
+                //     fwrite(lsp_temp, 1, sizeof(lsp_temp), f);
+                //     fclose(f);
+                //     exit(0);
+                // }
+            }
+        }
+        else if (address_full >= 0xc00000 && address_full < 0xcfffff)
+        {
+            // XP
+            printf("%02x%04x: write xp %02x%04x = %02x\n", mcu.cp, mcu.pc, page, address, value);
+            xp_temp[address & 0x7ffff] = value;
+        }
+        else
+            printf("%02x%04x: write %02x%04x\n", mcu.cp, mcu.pc, page, address);
+        return;
+    }
+
     else if (mcu_xp10)
     {
         if (page == 0)
@@ -1964,8 +2812,28 @@ void MCU_Write(uint32_t address, uint8_t value)
                 sram[address & 0x7fff] = value;
             else if (address >= 0x8000)
             {
-                printf("%02x%04x: write CSP %04x %02x\n", mcu.cp, mcu.pc, address & 0x3fff, value);
+                // if (!((address & 0x3fff) < 0x800 || ((address & 0x3fff) >= 0x1000 && (address & 0x3fff) < 0x2000)))
+                    printf("%02x%04x: write CSP %04x %02x\n", mcu.cp, mcu.pc, address & 0x3fff, value);
+                // else if ((address & 0x3fff) == 0x1001)
+                //     printf("%02x%04x: write CSP %04x %02x\n", mcu.cp, mcu.pc, address & 0x3fff, value);
+                
                 csp_temp[address & 0x3fff] = value;
+
+                // readback
+                if ((address & 0x3fff) >= 0x2000)
+                {
+                    csp_regs[1] = csp_temp[(address & 0x3fff) - 0x2000 + 1];
+                    csp_regs[2] = csp_temp[(address & 0x3fff) - 0x2000 + 2];
+                    csp_regs[3] = csp_temp[(address & 0x3fff) - 0x2000 + 3];
+                }
+
+                // uint8_t buf[4] = {0};
+                // buf[0] = 'w';
+                // buf[1] = (address >> 8) & 0xff;
+                // buf[2] = address & 0xff;
+                // buf[3] = value;
+                // write_bytes(serial_fd, buf, 4);
+                // read_byte(serial_fd);
             }
             else
                 printf("%02x%04x: write %02x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
@@ -2002,41 +2870,251 @@ void MCU_Write(uint32_t address, uint8_t value)
                 MCU_DeviceWrite_532(address & 0x7f, value);
             else if (address >= 0xfb80 && address < 0xff80 && (dev_register[DEV_RAME] & 0x80) != 0)
                 ram[(address - 0xfb80) & 0x3ff] = value;
-            else if (address >= 0xf000 && address < 0xf100) {
-                io_sd = address & 0xff;
-                // LCD_Enable((io_sd & 8) != 0);
-            }
             else if (address == 0xf105) {
-                printf("%02x%04x: write lcd %x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
                 LCD_Write(0, value);
                 ga_lcd_counter = 500;
             }
             else if (address == 0xf104) {
-                printf("%02x%04x: write lcd %x%04x %02x %c\n", mcu.cp, mcu.pc, page, address, value, value);
                 LCD_Write(1, value);
                 ga_lcd_counter = 500;
             }
-            else if (address == 0xf107)
-                io_sd = value;
+            else if (address >= 0xf100 && address < 0xf1ff) { // GA unknown
+            }
+            // else if (address < 0xa000) // weird write on the rom?
             else if (address >= 0x8000 && address < 0xa000)
                 sram[address & 0x7fff] = value;
-            else if (address == 0xa000)
+            else if (address == 0xa000) {
                 pccsr = value;
+                // printf("%02x%04x: h8  write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+            }
             else if (address >= 0xa001 && address < 0xa020) {
+                // printf("%02x%04x: h8  write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
                 dp_ram[address - 0xa001] = value;
                 pccsr |= 0b10;
+                // if (address == 0xa00f) {
+                //     printf("h8 data write ");
+                //     for (size_t i = 0; i < dp_ram[0]; i++)
+                //         printf("%02x ", dp_ram[i + 1]);
+                //     printf("\n");
+                // }
+            }
+            else if (address >= 0xb000 && address < 0xbfff) {
+                ep_temp[address & 0x7f] = value;
+                
+                // if (!(mcu.pc >= 0x389e && mcu.pc <= 0x38af))
+                    // printf("%02x%04x: ep  write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+
+                uint8_t pi = address & 0x7f;
+                uint8_t slot = ep_temp[0x7c] & 0x1f;
+
+                // write dir -> 12-11-10
+                
+                if (pi == 0x1a)
+                    ep_voices[slot].addrStart = (ep_voices[slot].addrStart & 0xffff00) | (value << 0);
+                else if (pi == 0x19)
+                    ep_voices[slot].addrStart = (ep_voices[slot].addrStart & 0xff00ff) | (value << 8);
+                else if (pi == 0x18)
+                    ep_voices[slot].addrStart = (ep_voices[slot].addrStart & 0x00ffff) | (value << 16);
+                
+                else if (pi == 0x16)
+                    ep_voices[slot].addrLoop = (ep_voices[slot].addrLoop & 0xffff00) | (value << 0);
+                else if (pi == 0x15)
+                    ep_voices[slot].addrLoop = (ep_voices[slot].addrLoop & 0xff00ff) | (value << 8);
+                else if (pi == 0x14)
+                    ep_voices[slot].addrLoop = (ep_voices[slot].addrLoop & 0x00ffff) | (value << 16);
+                
+                else if (pi == 0x12)
+                    ep_voices[slot].addrEnd = (ep_voices[slot].addrEnd & 0xffff00) | (value << 0);
+                else if (pi == 0x11)
+                    ep_voices[slot].addrEnd = (ep_voices[slot].addrEnd & 0xff00ff) | (value << 8);
+                else if (pi == 0x10)
+                    ep_voices[slot].addrEnd = (ep_voices[slot].addrEnd & 0x00ffff) | (value << 16);
+
+                else if (pi == 0x0e)
+                    ep_voices[slot].addrUnk0c = (ep_voices[slot].addrUnk0c & 0xffff00) | (value << 0);
+                else if (pi == 0x0d)
+                    ep_voices[slot].addrUnk0c = (ep_voices[slot].addrUnk0c & 0xff00ff) | (value << 8);
+                else if (pi == 0x0c)
+                    ep_voices[slot].addrUnk0c = (ep_voices[slot].addrUnk0c & 0x00ffff) | (value << 16);
+                
+                else if (pi == 0x2d)
+                    ep_voices[slot].unk2c = (ep_voices[slot].unk2c & 0xff00) | (value << 0);
+                else if (pi == 0x2c)
+                    ep_voices[slot].unk2c = (ep_voices[slot].unk2c & 0x00ff) | (value << 8);
+                
+                else if (pi == 0x30)
+                    ep_voices[slot].unk30 = (ep_voices[slot].unk30 & 0xff00) | (value << 0);
+                else if (pi == 0x31)
+                    ep_voices[slot].unk30 = (ep_voices[slot].unk30 & 0x00ff) | (value << 8);
+                
+                else if (pi == 0x38)
+                    ep_voices[slot].flags = (ep_voices[slot].flags & 0xff00) | (value << 0);
+                else if (pi == 0x39)
+                    ep_voices[slot].flags = (ep_voices[slot].flags & 0x00ff) | (value << 8);
+                
+                else if (pi == 0x1f)
+                    ep_active_voices = (ep_active_voices & 0xffffff00) | (value << 0);
+                else if (pi == 0x1e)
+                    ep_active_voices = (ep_active_voices & 0xffff00ff) | (value << 8);
+                else if (pi == 0x1d)
+                    ep_active_voices = (ep_active_voices & 0xff00ffff) | (value << 16);
+                else if (pi == 0x1c)
+                    ep_active_voices = (ep_active_voices & 0x00ffffff) | (value << 24);
+                
+                else if (pi == 0x3c)
+                    ep_unk3e = (ep_unk3e & 0xffff00) | (value << 0);
+                else if (pi == 0x3d)
+                    ep_unk3e = (ep_unk3e & 0xff00ff) | (value << 8);
+                else if (pi == 0x3e)
+                    ep_unk3e = (ep_unk3e & 0x00ffff) | (value << 16);
+                
+                else if (pi == 0x7c) {
+                    // voice select
+                }
+
+                else {
+                    // printf("%02x%04x: ep  write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+                }
+
+                if (pi == 0x18) {
+                    uint32_t value = ep_voices[slot].addrStart >> 4;
+                    PCM_Write(0x3e, slot);
+                    PCM_Write(0x05, (value >> 16) & 0xff); // address
+                    PCM_Write(0x06, (value >> 8) & 0xff);
+                    PCM_Write(0x07, (value >> 0) & 0xff);
+                }
+                else if (pi == 0x14) {
+                    uint32_t value = ep_voices[slot].addrLoop >> 4;
+                    PCM_Write(0x3e, slot);
+                    PCM_Write(0x09, (value >> 16) & 0xff); // address loop
+                    PCM_Write(0x0a, (value >> 8) & 0xff);
+                    PCM_Write(0x0b, (value >> 0) & 0xff);
+                }
+                else if (pi == 0x10) {
+                    uint32_t value = ep_voices[slot].addrEnd >> 4;
+                    PCM_Write(0x3e, slot);
+                    PCM_Write(0x0d, (value >> 16) & 0xff); // address end
+                    PCM_Write(0x0e, (value >> 8) & 0xff);
+                    PCM_Write(0x0f, (value >> 0) & 0xff);
+                }
+                else if (pi == 0x2c) {
+                    uint32_t value = ep_voices[slot].unk2c;
+                    PCM_Write(0x3e, slot);
+                    PCM_Write(0x10, (value >> 8) & 0xff);
+                    PCM_Write(0x11, (value >> 0) & 0xff);
+                }
+                else if (pi == 0x1f) {
+                    for (size_t i = 0; i < 32; i++) {
+                        bool slotOn = (ep_active_voices & (1 << i)) != 0;
+
+                        if (slotOn) {
+                            int bank = ep_voices[i].flags >> 12;
+                            bool pingpong = (ep_voices[i].flags >> 10) & 1;
+                            bool reverse = false; // ep has no reverse?
+                            int sbAddr = i & 0x1f;
+
+                            PCM_Write(0x3e, i);
+                            // PCM_Write(0x10, 0x38); // pitch coarse
+                            // PCM_Write(0x11, 0xc5); // pitch fine
+                            PCM_Write(0x10, (ep_voices[i].unk2c >> 8) & 0xff); // pitch coarse
+                            PCM_Write(0x11, (ep_voices[i].unk2c >> 0) & 0xff); // pitch fine
+                            PCM_Write(0x12, 0x40); // pan level l
+                            PCM_Write(0x13, 0x40); // pan level r
+                            PCM_Write(0x14, 0x00); // reverb send
+                            PCM_Write(0x15, 0x00); // chorus send
+                            PCM_Write(0x16, 0x40); // volume1 dest
+                            PCM_Write(0x17, 0x7f); // volume1 speed
+                            PCM_Write(0x18, 0x40); // volume2 dest
+                            PCM_Write(0x19, 0x7f); // volume2 speed
+                            PCM_Write(0x1a, 0x7f); // lpf cutoff dest (0x80)
+                            PCM_Write(0x1b, 0x7f); // lpf cutoff speed (0x7f)
+                            PCM_Write(0x1c, 0x40); // resonance
+                            PCM_Write(0x1d, 0x00); // filter mode (0x=lpf, 1x=hpf), irq (0=off, 1=on)
+                            PCM_Write(0x1e, bank); // bank?
+                            PCM_Write(0x1f, (pingpong << 6) | (reverse << 7) | sbAddr); // ?
+                        } else {
+                            PCM_Write(0x3e, i);
+                            PCM_Write(0x12, 0x00); // pan level l
+                            PCM_Write(0x13, 0x00); // pan level r
+                        }
+                    }
+                }
+            }
+            else if (address >= 0xc000 && address < 0xcfff) {
+                // printf("%02x%04x: key write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+            }
+            else if (address >= 0xd000 && address < 0xdfff) {
+                // printf("%02x%04x: tvf write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+                tvf_temp[address & 0x7f] = value;
+
+                uint8_t pi = address & 0x7f;
+                uint8_t slot = tvf_temp[0x40] & 0x1f;
+
+                if (pi == 0x08)
+                    ep_voices[slot].tvf_08 = (ep_voices[slot].tvf_08 & 0xffff00) | (value << 0);
+                else if (pi == 0x09)
+                    ep_voices[slot].tvf_08 = (ep_voices[slot].tvf_08 & 0xff00ff) | (value << 8);
+                else if (pi == 0x0a)
+                    ep_voices[slot].tvf_08 = (ep_voices[slot].tvf_08 & 0x00ffff) | (value << 16);
+                
+                if (pi == 0x20)
+                    ep_voices[slot].tvf_20 = (ep_voices[slot].tvf_20 & 0xffff00) | (value << 0);
+                else if (pi == 0x21)
+                    ep_voices[slot].tvf_20 = (ep_voices[slot].tvf_20 & 0xff00ff) | (value << 8);
+                else if (pi == 0x22)
+                    ep_voices[slot].tvf_20 = (ep_voices[slot].tvf_20 & 0x00ffff) | (value << 16);
+
+                else if (pi == 0x30)
+                    ep_voices[slot].tvf_30 = (ep_voices[slot].tvf_30 & 0xff00) | (value << 0);
+                else if (pi == 0x31)
+                    ep_voices[slot].tvf_30 = (ep_voices[slot].tvf_30 & 0x00ff) | (value << 8);
+
+                else if (pi == 0x34)
+                    ep_voices[slot].tvf_34 = (ep_voices[slot].tvf_34 & 0xff00) | (value << 0);
+                else if (pi == 0x35)
+                    ep_voices[slot].tvf_34 = (ep_voices[slot].tvf_34 & 0x00ff) | (value << 8);
             }
             else if (address >= 0xe000 && address < 0xefff) {
-                dsp_ram[address] = value;
-                printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+                mixer_reg[address & 0x1f] = value;
+                // printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+
+                if (address == 0xe007) {
+                    uint32_t addr = (mixer_reg[6] << 8) | mixer_reg[7];
+                    uint32_t data = (mixer_reg[3] << 24) | (mixer_reg[2] << 16) | (mixer_reg[1] << 8) | mixer_reg[0];
+                    dsp_temp[addr] = data;
+                    printf("DSP ram write %04x=%08x\n", addr, data);
+                }
+                else if (address == 0xe005) {
+                    uint32_t addr = (mixer_reg[4] << 8) | mixer_reg[5];
+                    // mixer_reg[3] = (dsp_temp[addr] >> 24) & 0xff;
+                    // mixer_reg[2] = (dsp_temp[addr] >> 16) & 0xff;
+                    // mixer_reg[1] = (dsp_temp[addr] >> 8) & 0xff;
+                    // mixer_reg[0] = dsp_temp[addr] & 0xff;
+                    printf("DSP ram read %04x=%08x\n", addr, dsp_temp[addr]);
+                    // printf("DSP ram ?? %04x\n", addr);
+                }
+                else if (address == 0xe009) {
+                    printf("DSP control 8 %02x%02x\n", mixer_reg[8], mixer_reg[9]);
+                }
+                else if (address == 0xe00b) {
+                    printf("DSP control a %02x%02x\n", mixer_reg[10], mixer_reg[11]);
+                }
+                else if (address == 0xe010) {
+                    // printf("DSP unk %02x%02x%02x%02x%02x\n", mixer_reg[0x10], mixer_reg[0x11], mixer_reg[0x12], mixer_reg[0x13], mixer_reg[0x14]);
+                }
             }
-            else
+            else {
                 printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+                // exit(1);
+            }
         }
+        else if (page == 0xc)
+            nvram[address & 0x7fff] = value;
         else if (page == 0xd)
             sram[address & 0x7fff] = value;
-        else
+        else {
             printf("%02x%04x: write %x%04x %02x\n", mcu.cp, mcu.pc, page, address, value);
+        }
         return;
     }
 
@@ -2237,7 +3315,7 @@ void MCU_Reset(void)
 
     MCU_DeviceReset();
 
-    if (mcu_mk1 || mcu_sc88 || mcu_jd800)
+    if (mcu_mk1 || mcu_sc88 || mcu_jd800 || mcu_sc88pro)
     {
         ga_int_enable = 255;
     }
@@ -2246,11 +3324,11 @@ void MCU_Reset(void)
     lcd_delay = 0;
     lcd_ready = true;
 
-    // TEST MODE
-    // SDL_AtomicSet(&mcu_button_pressed, ~0b11001111);
+    // SE70 TEST MODE
+    // SDL_AtomicSet(&mcu_button_pressed, 0b011000000);
 
-    // FACTORY SETTINGS
-    // SDL_AtomicSet(&mcu_button_pressed, ~0b10111111);
+    // SE70 FACTORY SETTINGS
+    // SDL_AtomicSet(&mcu_button_pressed, 1 << 8);
 }
 
 void MCU_PostUART(uint8_t data)
@@ -2261,7 +3339,7 @@ void MCU_PostUART(uint8_t data)
 
 void MCU_UpdateUART_RX(void)
 {
-    if (mcu_sc88)
+    if (mcu_sc88 || mcu_sc88pro)
     {
         if (uart_write_ptr == uart_read_ptr) // no byte
             return;
@@ -2347,18 +3425,24 @@ void MCU_WorkThread_Unlock(void)
     SDL_UnlockMutex(work_thread_lock);
 }
 
+static int prev_keys = 0;
+static int cnt = 0;
+
 int SDLCALL work_thread(void* data)
 {
     work_thread_lock = SDL_CreateMutex();
 
-    // PCM_Write(0x3c, 0xc0);
-    // PCM_Write(0x3d, 0x7b);
+    if (mcu_jd800)
+    {
+        PCM_Write(0x3c, 0xc0);
+        PCM_Write(0x3d, 0x7b);
 
-    // PCM_Write(0x00, 0x0f); // voice mask
-    // PCM_Write(0x01, 0xff);
-    // PCM_Write(0x02, 0xff);
-    // PCM_Write(0x03, 0xff);
-    // PCM_Read(0x00);
+        PCM_Write(0x00, 0x0f); // voice mask
+        PCM_Write(0x01, 0xff);
+        PCM_Write(0x02, 0xff);
+        PCM_Write(0x03, 0xff);
+        PCM_Read(0x00);
+    }
 
     // for (size_t i = 0; i < 28; i++)
     // {
@@ -2390,6 +3474,46 @@ int SDLCALL work_thread(void* data)
     //     PCM_Write(0x1f, 0x00); // ?
     // }
 
+    // PCM_Write(0x3e, 0); // channel sel
+    // PCM_Write(0x05, 0x00); // address
+    // PCM_Write(0x06, 0x00);
+    // PCM_Write(0x07, 0x04);
+    // PCM_Write(0x09, 0xc0); // address loop
+    // PCM_Write(0x0a, 0x6b);
+    // PCM_Write(0x0b, 0x04);
+    // PCM_Write(0x0d, 0xf0); // address end
+    // PCM_Write(0x0e, 0xf8);
+    // PCM_Write(0x0f, 0x06);
+    // PCM_Write(0x10, 0x38); // pitch coarse
+    // PCM_Write(0x11, 0xc5); // pitch fine
+    // PCM_Write(0x12, 0x7f); // pan level l
+    // PCM_Write(0x13, 0x7f); // pan level r
+    // PCM_Write(0x14, 0x00); // reverb send
+    // PCM_Write(0x15, 0x00); // chorus send
+    // PCM_Write(0x16, 0xff); // volume1 dest
+    // PCM_Write(0x17, 0x7f); // volume1 speed
+    // PCM_Write(0x18, 0xff); // volume2 dest
+    // PCM_Write(0x19, 0x7f); // volume2 speed
+    // PCM_Write(0x1a, 0x7f); // lpf cutoff dest (0x80)
+    // PCM_Write(0x1b, 0x7f); // lpf cutoff speed (0x7f)
+    // PCM_Write(0x1c, 0x40); // resonance
+    // PCM_Write(0x1d, 0x00); // filter mode (0x=lpf, 1x=hpf), irq (0=off, 1=on)
+    // PCM_Write(0x1e, 3<<1); // bank?
+    // PCM_Write(0x1f, 0x00); // ?
+
+    // loadState("state_loadlsp.bin");
+
+    // uint32_t button_pressed_tmp = 0x00;
+
+    int param_r2, param_r3;
+    int tbl0, tbl1;
+    int test;
+
+    uint8_t dp_pre = 0;
+    uint8_t dp_post = 0;
+    uint16_t sp_pre = 0;
+    uint16_t sp_post = 0;
+
     MCU_WorkThread_Lock();
     while (work_thread_run)
     {
@@ -2412,15 +3536,75 @@ int SDLCALL work_thread(void* data)
         else
             mcu.ex_ignore = 0;
 
-        // if (mcu.cp == 0x00 && mcu.pc == 0x000A2C)
-        //     printf("here\n");
+        // if (button_pressed_tmp > 0)
+        //     button_pressed_tmp = 0;
+        // else
+        //     button_pressed_tmp = 1 << MCU_BUTTON_INST_ALL;
+        // SDL_AtomicSet(&mcu_button_pressed, (int)button_pressed_tmp);
+
+        // if (mcu.cp == 0x00 && mcu.pc == 0x3263)
+        // {
+        //     param_r2 = mcu.r[2];
+        //     param_r3 = mcu.r[3];
+        //     test = 0;
+        //     // printf("here\n");
+        // }
+        // if (mcu.cp == 0x00 && mcu.pc == 0x32b6) // rts
+        // {
+        //     printf("ret r2:%04x r3:%04x ret:%04x  tbl0:%04x tbl1:%04x  test:%04x\n", param_r2, param_r3, mcu.r[4], tbl0, tbl1, test);
+        //     mcu.r[4] = tbl0>>2;
+        // }
+        // if (mcu.cp == 0x00 && mcu.pc == 0x3291)
+        //     tbl0 = mcu.r[1];
+        // if (mcu.cp == 0x00 && mcu.pc == 0x329b)
+        //     tbl1 = mcu.r[2];
+        // if (mcu.cp == 0x00 && mcu.pc == 0x3270)
+        //     test = 1;
+        // if (mcu.cp == 0x00 && mcu.pc == 0x3263 && mcu.r[0] == 0x931e)
+        //     printf("\033[2J\033[H");
+        
         // if (mcu.cp == 0x07 && mcu.pc >= 0xC4FE && mcu.pc <= 0xC5D0)
         //     printf("pc %02x%04x\n", mcu.cp, mcu.pc);
         // if (mcu.cp == 0x00 && mcu.pc >= 0x0000 && mcu.pc <= 0x0FFF)
         //     printf("pc %02x%04x\n", mcu.cp, mcu.pc);
 
+        // if (mcu.cp == 0x01 && mcu.pc == 0x1106)
+        //     printf("here\n");
+        // if (mcu.cp == 0x01 && mcu.pc == 0x10f6)
+        //     printf("here\n");
+
+        // if (mcu.cp == 0x00 && mcu.pc == 0x0369) {
+        //     dp_pre = mcu.dp;
+        //     sp_pre = mcu.r[7];
+        // }
+        // if (mcu.cp == 0x00 && (mcu.pc == 0x03ae || mcu.pc == 0x03b7)) {
+        //     dp_post = mcu.dp;
+        //     sp_post = mcu.r[7];
+        //     if (dp_pre != dp_post) {
+        //         // printf("FAIL: dp change: %02x%04x %02x -> %02x   sp_pre:%04x sp_post:%04x\n", mcu.cp, mcu.pc, dp_pre, dp_post, sp_pre, sp_post);
+        //     }
+        //     else {
+        //         // printf("PASS: dp change: %02x%04x %02x -> %02x   sp_pre:%04x sp_post:%04x\n", mcu.cp, mcu.pc, dp_pre, dp_post, sp_pre, sp_post);
+        //     }
+        // }
+        
+        // if (mcu.cp == 0x00 && mcu.pc == 0x038e) {
+        //     // printf("here 1 dp:%04x\n", mcu.dp);
+        // }
+        // // if (mcu.cp == 0x00 && mcu.pc == 0x03a8) {
+        // //     printf("here 2 dp:%04x\n", mcu.dp);
+        // // }
+        // if (mcu.cp == 0x00 && mcu.pc == 0x1993) {
+        //     // printf("here 3\n");
+        //     // exit(1);
+        // }
+
+        // if (shouldLog)
         // printf("pc %02x%04x\n", mcu.cp, mcu.pc);
-        // printf("pc %02x%04x sp %02x%04x\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7]);
+        
+        // if (mcu.cp == 0x00 && (mcu.pc >= 0x0370 && mcu.pc <= 0x03b7))
+            // printf("pc %02x%04x sp:%02x%04x dp:%02x\n", mcu.cp, mcu.pc, mcu.tp, mcu.r[7], mcu.dp);
+
         if (!mcu.sleep)
             MCU_ReadInstruction();
 
@@ -2433,7 +3617,9 @@ int SDLCALL work_thread(void* data)
 
         TIMER_Clock(mcu.cycles);
 
-        if (!mcu_mk1 && !mcu_jv880 && !mcu_scb55 && !mcu_rd500 && !mcu_sc88 && !mcu_xp10 && !mcu_ra30 && !mcu_sy99 && !mcu_se70 && !mcu_jd800)
+        if (!mcu_mk1 && !mcu_jv880 && !mcu_scb55 && !mcu_rd500 && !mcu_sc88
+            && !mcu_xp10 && !mcu_ra30 && !mcu_sy99 && !mcu_se70 && !mcu_jd800
+            && !mcu_sc88pro && !mcu_jd990)
             SM_Update(mcu.cycles);
         else
         {
@@ -2441,16 +3627,65 @@ int SDLCALL work_thread(void* data)
             MCU_UpdateUART_TX();
         }
 
+        if (mcu_jd800)
+        {
+            // int cur_keys = SDL_AtomicGet(&mcu_button_pressed);
+            // if (prev_keys != cur_keys && cur_keys > 0)
+            // {
+            //     MCU_GA_SetGAInt(3, 0);
+            //     MCU_GA_SetGAInt(3, 1);
+            // }
+            // prev_keys = cur_keys;
+
+            for (size_t i = 0; i < 0x40; i++)
+            {
+                if (jd800_btn_down[i] != jd800_btn_down_status[i])
+                {
+                    jd800_btn_down_status[i] = jd800_btn_down[i];
+                    jd800_btn_todo = i;
+                    MCU_GA_SetGAInt(3, 0);
+                    MCU_GA_SetGAInt(3, 1);
+                }
+            }
+            
+
+            cnt++;
+
+            // if (cnt >= 10000000)
+            // {
+            //     MCU_GA_SetGAInt(2, 0);
+            //     MCU_GA_SetGAInt(2, 1);
+            //     cnt = 10000000 - 1000;
+            // }
+            
+            // if (cnt >= 1000)
+            // {
+            //     printf("\033[2J\033[H");
+            //     printf("active voices: %08x\n", ep_active_voices);
+            //     printf("unk3e: %08x\n", ep_unk3e);
+            //     for (size_t i = 0; i < 24; i++) {
+            //         printf("%02x:   %06x  %06x  %06x  %06x  %04x  %04x  %04x    %06x  %06x  %04x  %04x\n", i,
+            //             ep_voices[i].addrStart, ep_voices[i].addrLoop, ep_voices[i].addrEnd, ep_voices[i].addrUnk0c,
+            //             ep_voices[i].unk2c, ep_voices[i].unk30, ep_voices[i].flags,
+            //             ep_voices[i].tvf_08, ep_voices[i].tvf_20, ep_voices[i].tvf_30, ep_voices[i].tvf_34
+            //         );
+            //     }
+            //     fflush(stdout);
+
+            //     cnt = 0;
+            // }
+        }
+
         MCU_UpdateAnalog(mcu.cycles);
 
-        if (mcu_mk1 || mcu_sc88 || mcu_jd800)
+        if (mcu_mk1 || mcu_sc88 || mcu_jd800 || mcu_sc88pro)
         {
             if (ga_lcd_counter)
             {
                 ga_lcd_counter--;
                 if (ga_lcd_counter == 0)
                 {
-                    printf("ga int lcd\n");
+                    // printf("ga int lcd\n");
                     MCU_GA_SetGAInt(1, 0);
                     MCU_GA_SetGAInt(1, 1);
                 }
@@ -2506,6 +3741,11 @@ void MCU_PatchROM(void)
         // rom2[0x41ECF] = 0x00;
     }
 
+    if (mcu_se70)
+    {
+        // rom2[0x613E5] = 0x26;
+    }
+
     //rom2[0x1333] = 0x11;
     //rom2[0x1334] = 0x19;
     //rom1[0x622d] = 0x19;
@@ -2546,7 +3786,7 @@ void MCU_WriteP1(uint8_t data)
     mcu_p1_data = data;
 }
 
-uint8_t tempbuf[0x800000];
+uint8_t *tempbuf;
 
 void unscramble(uint8_t *src, uint8_t *dst, int len, bool sc88 = false)
 {
@@ -2627,7 +3867,7 @@ int MCU_OpenAudio(int deviceIndex, int pageSize, int pageNum)
     
     spec.format = AUDIO_S16SYS;
     // spec.freq = mcu_sc88 ? 64000*2 : (mcu_mk1 || mcu_jv880 || mcu_rd500) ? 64000 : 66207;
-    spec.freq = mcu_sc88 ? 64000 : (mcu_mk1 || mcu_jv880 || mcu_rd500) ? 64000 : 66207;
+    spec.freq = mcu_jd800 ? (44100*2) : mcu_sc88 ? 64000 : (mcu_mk1 || mcu_jv880 || mcu_rd500) ? 64000 : 66207;
     spec.channels = 2;
     spec.callback = audio_callback;
     spec.samples = audio_page_size / 4;
@@ -2712,7 +3952,7 @@ void MCU_GA_SetGAInt(int line, int value)
         ga_int_trigger = line;
     ga_int[line] = value;
 
-    if (mcu_jv880 || mcu_sc88 || mcu_jd800)
+    if (mcu_jv880 || mcu_sc88 || mcu_jd800 || mcu_sc88pro)
         MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ0, ga_int_trigger != 0);
     else
         MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_IRQ1, ga_int_trigger != 0);
@@ -2785,6 +4025,9 @@ void MIDI_Reset(ResetType resetType)
 
 int main(int argc, char *argv[])
 {
+    serial_fd = open_serial("/dev/cu.usbmodem1101");
+    sleep(2); // wait for serial port to be ready
+    
     (void)argc;
     std::string basePath;
 
@@ -2893,10 +4136,12 @@ int main(int argc, char *argv[])
                 printf("  -rd500                         Use RD-500 ROM set.\n");
                 printf("  -sc88                          Use SC-88 ROM set.\n");
                 printf("  -sc88vl                        Use SC-88VL ROM set.\n");
+                printf("  -sc88pro                       Use SC-88pro ROM set.\n");
                 printf("  -xp10                          Use XP-10 ROM set.\n");
                 printf("  -ra30                          Use RA-30 ROM set.\n");
                 printf("  -sy99                          Use SY-99 ROM set.\n");
                 printf("  -jd800                         Use JD-800 ROM set.\n");
+                printf("  -jd990                         Use JD-990 ROM set.\n");
                 printf("\n");
                 printf("  -gs                            Reset system in GS mode.\n");
                 printf("  -gm                            Reset system in GM mode.\n");
@@ -2927,6 +4172,11 @@ int main(int argc, char *argv[])
                 romset = ROM_SET_SC88VL;
                 autodetect = false;
             }
+            else if (!strcmp(argv[i], "-sc88pro"))
+            {
+                romset = ROM_SET_SC88PRO;
+                autodetect = false;
+            }
             else if (!strcmp(argv[i], "-xp10"))
             {
                 romset = ROM_SET_XP10;
@@ -2950,6 +4200,11 @@ int main(int argc, char *argv[])
             else if (!strcmp(argv[i], "-jd800"))
             {
                 romset = ROM_SET_JD800;
+                autodetect = false;
+            }
+            else if (!strcmp(argv[i], "-jd990"))
+            {
+                romset = ROM_SET_JD990;
                 autodetect = false;
             }
         }
@@ -3008,12 +4263,15 @@ int main(int argc, char *argv[])
     mcu_rd500 = false;
     mcu_sc88 = false;
     mcu_sc88vl = false;
+    mcu_sc88pro = false;
     mcu_xp10 = false;
     mcu_ra30 = false;
     mcu_sy99 = false;
     mcu_se70 = false;
     mcu_jd800 = false;
+    mcu_jd990 = false;
     mcu_h8_510 = false;
+    mcu_h8_570 = false;
     switch (romset)
     {
         case ROM_SET_MK2:
@@ -3046,7 +4304,7 @@ int main(int argc, char *argv[])
         case ROM_SET_JD800:
             mcu_jd800 = true;
             rom2_mask /= 2; // rom is half the size
-            lcd_width = 820;
+            lcd_width = 1370;
             lcd_height = 100;
             break;
         case ROM_SET_SCB55:
@@ -3060,6 +4318,10 @@ int main(int argc, char *argv[])
         case ROM_SET_SC88VL:
             mcu_sc88 = true;
             mcu_sc88vl = true;
+            mcu_h8_510 = true;
+            break;
+        case ROM_SET_SC88PRO:
+            mcu_sc88pro = true;
             mcu_h8_510 = true;
             break;
         case ROM_SET_RD500:
@@ -3096,6 +4358,11 @@ int main(int argc, char *argv[])
             lcd_col1 = 0x000000;
             lcd_col2 = 0x78b500;
             mcu_h8_510 = true;
+            break;
+        case ROM_SET_JD990:
+            mcu_jd990 = true;
+            mcu_h8_570 = true;
+            rom2_mask /= 2; // rom is half the size
             break;
     }
 
@@ -3137,7 +4404,7 @@ int main(int argc, char *argv[])
     memset(&mcu, 0, sizeof(mcu_t));
 
 
-    if (!mcu_h8_510 && fread(rom1, 1, ROM1_SIZE, s_rf[0]) != ROM1_SIZE)
+    if (!(mcu_h8_510 || mcu_h8_570) && fread(rom1, 1, ROM1_SIZE, s_rf[0]) != ROM1_SIZE)
     {
         fprintf(stderr, "FATAL ERROR: Failed to read the mcu ROM1.\n");
         fflush(stderr);
@@ -3148,11 +4415,16 @@ int main(int argc, char *argv[])
     if (mcu_sy99)
     {
     }
+    else if (mcu_sc88pro)
+    {
+        fseek(s_rf[1], 0x300000, SEEK_SET);
+        fread(rom2, 1, ROM2_SIZE, s_rf[1]);
+    }
     else
     {
         size_t rom2_read = fread(rom2, 1, ROM2_SIZE, s_rf[1]);
 
-        if (rom2_read == ROM2_SIZE || rom2_read == ROM2_SIZE / 2)
+        if (rom2_read == ROM2_SIZE || rom2_read == ROM2_SIZE / 2 || rom2_read == ROM2_SIZE / 4)
         {
             rom2_mask = rom2_read - 1;
         }
@@ -3178,7 +4450,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (mcu_rd500 || mcu_sc88vl)
+    if (mcu_rd500 || mcu_sc88vl || mcu_jd990)
     {
         // The ROM is 16 bits big-endian
         for (size_t i = 0; i < ROM2_SIZE; i += 2)
@@ -3188,6 +4460,8 @@ int main(int argc, char *argv[])
             rom2[i + 1] = temp;
         }
     }
+
+    tempbuf = (uint8_t*)malloc(0x800000);
 
     if (mcu_mk1)
     {
@@ -3254,6 +4528,41 @@ int main(int argc, char *argv[])
             printf("WaveRom PCM not found, skipping it.\n");
     }
     else if (mcu_jd800)
+    {
+        if (fread(tempbuf, 1, 0x100000, s_rf[2]) != 0x100000)
+        {
+            fprintf(stderr, "FATAL ERROR: Failed to read the WaveRom1.\n");
+            fflush(stderr);
+            closeAllR();
+            return 1;
+        }
+
+        unscramble(tempbuf, waverom1, 0x100000);
+        // {FILE *f = fopen("test_unscr_1.bin", "wb"); fwrite(waverom1, 1, 0x100000, f); fclose(f);}
+
+        if (fread(tempbuf, 1, 0x100000, s_rf[3]) != 0x100000)
+        {
+            fprintf(stderr, "FATAL ERROR: Failed to read the WaveRom2.\n");
+            fflush(stderr);
+            closeAllR();
+            return 1;
+        }
+
+        unscramble(tempbuf, waverom2, 0x100000);
+        // {FILE *f = fopen("test_unscr_2.bin", "wb"); fwrite(waverom2, 1, 0x100000, f); fclose(f);}
+
+        if (fread(tempbuf, 1, 0x100000, s_rf[4]) != 0x100000)
+        {
+            fprintf(stderr, "FATAL ERROR: Failed to read the WaveRom3.\n");
+            fflush(stderr);
+            closeAllR();
+            return 1;
+        }
+
+        unscramble(tempbuf, waverom3, 0x100000);
+    //     {FILE *f = fopen("test_unscr_3.bin", "wb"); fwrite(waverom3, 1, 0x100000, f); fclose(f);}
+    }
+    else if (mcu_jd990)
     {
         // TODO
     }
@@ -3324,7 +4633,7 @@ int main(int argc, char *argv[])
             unscramble(tempbuf, waverom2, 0x100000);
         }
     }
-    else if (mcu_sc88)
+    else if (mcu_sc88 || mcu_sc88pro)
     {
         if (fread(tempbuf, 1, 0x200000, s_rf[2]) != 0x200000)
         {
@@ -3465,6 +4774,14 @@ int main(int argc, char *argv[])
             fclose(f);
         }
     }
+
+    if (mcu_jd800)
+    {
+        FILE *f = fopen("nvram_jd800.bin", "rb");
+        fread(nvram, 1, sizeof(nvram), f);
+        fclose(f);
+        // memset(nvram, 0xff, sizeof(nvram));
+    }
     
     MCU_Run();
 
@@ -3472,6 +4789,13 @@ int main(int argc, char *argv[])
     {
         FILE *f = fopen("sram_se70.bin", "wb");
         fwrite(sram, 1, 0x8000, f);
+        fclose(f);
+    }
+    
+    if (mcu_jd800)
+    {
+        FILE *f = fopen("nvram_jd800.bin", "wb");
+        fwrite(nvram, 1, sizeof(nvram), f);
         fclose(f);
     }
 

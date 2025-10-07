@@ -249,7 +249,7 @@ void TIMER_Clock(uint64_t cycles)
                     continue;
                 break;
             case 3: // ext (o / 2)
-                if (mcu_mk1 || mcu_sc88) // FIXME SC88
+                if (mcu_mk1 || mcu_sc88 || mcu_sc88pro || mcu_jd800 || mcu_se70) // FIXME SC88
                 {
                     if (timer_cycles & 3)
                         continue;
@@ -310,7 +310,7 @@ void TIMER_Clock(uint64_t cycles)
         case 5:
         case 6:
         case 7: // ext (o / 2)
-            if (mcu_mk1)
+            if (mcu_mk1 || mcu_jd800 || mcu_se70)
             {
                 if ((timer_cycles & 3) == 0)
                     timer_step = 1;

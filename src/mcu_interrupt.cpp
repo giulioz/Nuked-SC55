@@ -77,6 +77,7 @@ void MCU_Interrupt_StartVector(uint32_t vector, int32_t mask)
     MCU_Interrupt_Start(mask);
     mcu.cp = address >> 16;
     mcu.pc = address;
+    // printf("INT START %06x\n", address);
     // printf("pc %02x%04x INT START vector=%04x mask=%04x sr=%02x\n", mcu.cp, mcu.pc, vector, mask, mcu.sr >> 8);
 }
 
@@ -140,7 +141,79 @@ void MCU_Interrupt_Handle(void)
         int32_t level = 0;
         if (!mcu.interrupt_pending[i])
             continue;
-        if (mcu_h8_510)
+        if (mcu_h8_570)
+        {
+            switch (i)
+            {
+                case INTERRUPT_SOURCE_ISF0:
+                    vector = VECTOR_INTERNAL_INTERRUPT_A0;
+                    level = (dev_register[DEV_IPRB] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF1:
+                    vector = VECTOR_INTERNAL_INTERRUPT_A4;
+                    level = (dev_register[DEV_IPRB] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF2:
+                    vector = VECTOR_INTERNAL_INTERRUPT_A8;
+                    level = (dev_register[DEV_IPRB] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF3:
+                    vector = VECTOR_INTERNAL_INTERRUPT_AC;
+                    level = (dev_register[DEV_IPRB] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF4:
+                    vector = VECTOR_INTERNAL_INTERRUPT_B0;
+                    level = (dev_register[DEV_IPRB] >> 4) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF5:
+                    vector = VECTOR_INTERNAL_INTERRUPT_B4;
+                    level = (dev_register[DEV_IPRB] >> 4) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF6:
+                    vector = VECTOR_INTERNAL_INTERRUPT_B8;
+                    level = (dev_register[DEV_IPRB] >> 4) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF7:
+                    vector = VECTOR_INTERNAL_INTERRUPT_BC;
+                    level = (dev_register[DEV_IPRB] >> 4) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF8:
+                    vector = VECTOR_INTERNAL_INTERRUPT_C0;
+                    level = (dev_register[DEV_IPRC] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF9:
+                    vector = VECTOR_INTERNAL_INTERRUPT_C4;
+                    level = (dev_register[DEV_IPRC] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF10:
+                    vector = VECTOR_INTERNAL_INTERRUPT_C8;
+                    level = (dev_register[DEV_IPRC] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF11:
+                    vector = VECTOR_INTERNAL_INTERRUPT_CC;
+                    level = (dev_register[DEV_IPRC] >> 0) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF12:
+                    vector = VECTOR_INTERNAL_INTERRUPT_D0;
+                    level = (dev_register[DEV_IPRC] >> 4) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF13:
+                    vector = VECTOR_INTERNAL_INTERRUPT_D4;
+                    level = (dev_register[DEV_IPRC] >> 4) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF14:
+                    vector = VECTOR_INTERNAL_INTERRUPT_D8;
+                    level = (dev_register[DEV_IPRC] >> 4) & 7;
+                    break;
+                case INTERRUPT_SOURCE_ISF15:
+                    vector = VECTOR_INTERNAL_INTERRUPT_DC;
+                    level = (dev_register[DEV_IPRC] >> 4) & 7;
+                    break;
+                default:
+                    break;
+            }
+        }
+        else if (mcu_h8_510)
         {
             switch (i)
             {

@@ -432,6 +432,7 @@ void MCU_Jump_JMP(uint8_t operand)
     }
     else if (operand == 0x01)
     {
+        // SCB/F
         uint8_t opcode = MCU_ReadCodeAdvance();
         uint8_t reg = opcode & 0x07;
         opcode >>= 3;
@@ -560,9 +561,9 @@ uint32_t MCU_Operand_Read(void)
             {
                 MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
             }
-            return MCU_Read16(MCU_GetAddress(operand_ep, operand_ea));
+            return MCU_Read16(MCU_GetAddress(operand_ep, operand_ea), false);
         }
-        return MCU_Read(MCU_GetAddress(operand_ep, operand_ea));
+        return MCU_Read(MCU_GetAddress(operand_ep, operand_ea), false);
     case GENERAL_IMMEDIATE:
         return operand_data;
     }
@@ -784,13 +785,13 @@ void MCU_Opcode_Short_MOVF(uint8_t opcode)
         uint16_t data;
         if (siz)
         {
-            data = MCU_Read16(addr);
+            data = MCU_Read16(addr, false);
             mcu.r[reg] = data;
             MCU_SetStatusCommon(data, 1);
         }
         else
         {
-            data = MCU_Read(addr);
+            data = MCU_Read(addr, false);
             mcu.r[reg] &= ~0xff;
             mcu.r[reg] |= data;
             MCU_SetStatusCommon(data, 0);
@@ -825,13 +826,13 @@ void MCU_Opcode_Short_MOVL(uint8_t opcode)
     {
         if (addr & 1)
             MCU_Interrupt_Exception(EXCEPTION_SOURCE_ADDRESS_ERROR);
-        data = MCU_Read16(addr);
+        data = MCU_Read16(addr, false);
         mcu.r[reg] = data;
         MCU_SetStatusCommon(data, 1);
     }
     else
     {
-        data = MCU_Read(addr);
+        data = MCU_Read(addr, false);
         mcu.r[reg] &= ~0xff;
         mcu.r[reg] |= data;
         MCU_SetStatusCommon(data, 0);
@@ -909,6 +910,7 @@ void MCU_Opcode_MOVG_Immediate(uint8_t opcode, uint8_t opcode_reg)
     }
     else if (opcode_reg == 4 && (operand_type == GENERAL_INDIRECT || operand_type == GENERAL_ABSOLUTE) && operand_size == OPERAND_WORD) // FIXME
     {
+        // printf("%x%04x: fixme 0\n", mcu.cp, mcu.pc);
         uint32_t t1 = MCU_Operand_Read();
         uint32_t t2 = (uint16_t)((int8_t)MCU_ReadCodeAdvance());
         MCU_SUB_Common(t1, t2, 0, OPERAND_WORD);
@@ -923,11 +925,13 @@ void MCU_Opcode_MOVG_Immediate(uint8_t opcode, uint8_t opcode_reg)
     }
     else if (opcode_reg == 5 && (operand_type == GENERAL_INDIRECT || operand_type == GENERAL_ABSOLUTE) && operand_size == OPERAND_BYTE) // FIXME
     {
+        // CMP
         uint32_t t1, t2;
         t1 = MCU_Operand_Read();
         t2 = MCU_ReadCodeAdvance() << 8;
         t2 |= MCU_ReadCodeAdvance();
         MCU_SUB_Common(t1, t2, 0, OPERAND_BYTE);
+        // printf("%x%04x: fixme 1 reg:%x t1:%02x t2:%02x\n", mcu.cp, mcu.pc-3, opcode_reg, t1, t2);
     }
     else
     {
@@ -1069,6 +1073,8 @@ void MCU_Opcode_LDC(uint8_t opcode, uint8_t opcode_reg)
     else
     {
         uint32_t data = MCU_Operand_Read();
+        // if (operand_reg == 7 && opcode_reg != 4)
+        //     printf("fixme 2 %d %04x\n", opcode_reg, data);
         MCU_ControlRegisterWrite(opcode_reg, operand_size, data);
     }
     mcu.ex_ignore = 1;
@@ -1087,6 +1093,8 @@ void MCU_Opcode_STC(uint8_t opcode, uint8_t opcode_reg)
     else
     {
         uint32_t data = MCU_ControlRegisterRead(opcode_reg, operand_size);
+        // if (operand_reg == 7 && opcode_reg != 4)
+        //     printf("fixme stc %d %04x\n", opcode_reg, data);
         MCU_Operand_Write(data);
     }
 }
