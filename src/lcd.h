@@ -1,57 +1,195 @@
-/*
- * Copyright (C) 2021, 2024 nukeykt
- *
- *  Redistribution and use of this code or any derivative works are permitted
- *  provided that the following conditions are met:
- *
- *   - Redistributions may not be sold, nor may they be used in a commercial
- *     product or activity.
- *
- *   - Redistributions that are modified from the original source must include the
- *     complete source code, including the source code for all components used by a
- *     binary built from the modified sources. However, as a special exception, the
- *     source code distributed need not include anything that is normally distributed
- *     (in either source or binary form) with the major components (compiler, kernel,
- *     and so on) of the operating system on which the executable runs, unless that
- *     component itself accompanies the executable.
- *
- *   - Redistributions must reproduce the above copyright notice, this list of
- *     conditions and the following disclaimer in the documentation and/or other
- *     materials provided with the distribution.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- *  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- *  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- *  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- *  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- *  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- *  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- *  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- */
 #pragma once
 
 #include <stdint.h>
-#include <string>
 
-extern int lcd_width;
-extern int lcd_height;
+class LCD {
+public:
+  int mode = 0;
+  int stage = 0;
+  bool display_enabled = false;
 
-extern uint32_t lcd_col1;
-extern uint32_t lcd_col2;
+  bool config_m0 = 0;     // internal/external cg rom
+  bool config_m1 = 0;     // d6 correction
+  bool config_m2 = 0;     // 8/16 pixels height
+  bool config_ws = 0;     // single/dual panel
+  bool config_iv = 0;     // invert
+  uint8_t config_fx = 0;  // char pixel width
+  bool config_wf = 0;     // ac frame wf period
+  uint8_t config_fy = 0;  // vertical char size
+  uint8_t config_cr = 0;  // bytes per line
+  uint8_t config_tcr = 0; // line length
+  uint8_t config_lf = 0;  // height in lines
+  uint16_t config_ap = 0; // virtual screen horizontal address
 
-extern uint8_t LCD_Data[80];
-extern uint8_t LCD_CG[64];
-extern uint8_t LCD_7SEG[3];
+  uint16_t scroll_sad1 = 0;
+  uint16_t scroll_sad2 = 0;
+  uint16_t scroll_sad3 = 0;
+  uint16_t scroll_sad4 = 0;
+  uint8_t scroll_sl1 = 0; // screen lines
+  uint8_t scroll_sl2 = 0;
 
-void LCD_SetBackPath(const std::string &path);
-void LCD_Init(void);
-void LCD_UnInit(void);
-void LCD_Write(uint32_t address, uint8_t data);
-void LCD_Write_7seg(uint8_t address, uint8_t data);
-void LCD_Enable(uint32_t enable);
-bool LCD_QuitRequested();
-void LCD_Sync(void);
-void LCD_Update(void);
+  uint8_t cursor_dir = 0;
+  uint16_t cursor = 0;
+
+  uint8_t memory[0x2000] = {0};
+
+  void writeData(uint8_t value) {
+    if (mode == 0x40) {
+      // system set
+      switch (stage) {
+      case 0:
+        config_m0 = (value & 1) != 0;
+        config_m1 = (value & 2) != 0;
+        config_m2 = (value & 4) != 0;
+        config_ws = (value & 8) != 0;
+        config_iv = (value & 32) != 0;
+        break;
+      case 1:
+        config_fx = value & 0b111;
+        config_wf = (value & 128) != 0;
+        break;
+      case 2:
+        config_fy = value & 0b11111;
+        break;
+      case 3:
+        config_cr = value;
+        break;
+      case 4:
+        config_tcr = value;
+        break;
+      case 5:
+        config_lf = value;
+        break;
+      case 6:
+        config_ap = (config_ap & 0xff00) | value;
+        break;
+      case 7:
+        config_ap = (config_ap & 0x00ff) | (value << 8);
+        break;
+      }
+      stage += 1;
+      return;
+    }
+
+    if (mode == 0x44) {
+      // scroll
+      switch (stage) {
+      case 0:
+        scroll_sad1 = (scroll_sad1 & 0xff00) | value;
+        break;
+      case 1:
+        scroll_sad1 = (scroll_sad1 & 0x00ff) | (value << 8);
+        break;
+      case 2:
+        scroll_sl1 = value;
+        break;
+      case 3:
+        scroll_sad2 = (scroll_sad2 & 0xff00) | value;
+        break;
+      case 4:
+        scroll_sad2 = (scroll_sad2 & 0x00ff) | (value << 8);
+        break;
+      case 5:
+        scroll_sl2 = value;
+        break;
+      case 6:
+        scroll_sad3 = (scroll_sad3 & 0xff00) | value;
+        break;
+      case 7:
+        scroll_sad3 = (scroll_sad3 & 0x00ff) | (value << 8);
+        break;
+      case 8:
+        scroll_sad4 = (scroll_sad4 & 0xff00) | value;
+        break;
+      case 9:
+        scroll_sad4 = (scroll_sad4 & 0x00ff) | (value << 8);
+        break;
+      }
+      stage += 1;
+      return;
+    }
+
+    if (mode == 0x46) {
+      // set cursor addr
+      switch (stage) {
+      case 0:
+        cursor = (cursor & 0xff00) | value;
+        break;
+      case 1:
+        cursor = (cursor & 0x00ff) | (value << 8);
+        break;
+      }
+      stage += 1;
+      return;
+    }
+
+    if (mode == 0x42) {
+      // mem write
+      memory[cursor & 0x1fff] = value;
+      cursor += 1; // hack
+      return;
+    }
+  }
+
+  void writeParam(uint8_t value) {
+    if (value == 0x40) {
+      // system set
+      mode = 0x40;
+      stage = 0;
+      display_enabled = false;
+      return;
+    }
+
+    if (value == 0x42) {
+      // mem write
+      mode = 0x42;
+      return;
+    }
+
+    if (value == 0x44) {
+      // scroll
+      mode = 0x44;
+      stage = 0;
+      return;
+    }
+
+    if (value == 0x46) {
+      // set cursor addr
+      mode = 0x46;
+      stage = 0;
+      return;
+    }
+
+    if (value >= 0x4c && value <= 0x4f) {
+      // set cursor dir
+      cursor_dir = value & 3;
+      return;
+    }
+
+    if ((value & 0xfe) == 0x58) {
+      // display on/off
+      display_enabled = (value & 1) != 0;
+      return;
+    }
+
+    if (value == 0x5a) {
+      // set horiz scroll position
+      return;
+    }
+
+    if (value == 0x5b) {
+      // set display overlay format
+      return;
+    }
+
+    if (value == 0x5c) {
+      // set char gen start address
+      return;
+    }
+
+    if (value == 0x5d) {
+      // set cursor type
+      return;
+    }
+  }
+};

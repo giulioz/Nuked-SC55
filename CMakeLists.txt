@@ -185,25 +185,23 @@ if(USE_PORTMIDI)
     add_subdirectory(3rdparty/portmidi)
 endif()
 
+add_library(imgui
+  3rdparty/imgui/imgui.cpp
+  3rdparty/imgui/imgui_draw.cpp
+  3rdparty/imgui/imgui_tables.cpp
+  3rdparty/imgui/imgui_widgets.cpp
+  3rdparty/imgui/backends/imgui_impl_sdl2.cpp
+  3rdparty/imgui/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC 3rdparty/imgui 3rdparty/imgui/backends ${SDL2_INCLUDE_DIRS})
+target_link_libraries(imgui PRIVATE ${SDL2_LIBRARIES})
+
 
 set(SC55_SRC
     src/mcu.cpp src/mcu.h # main() is here!
-    src/lcd.cpp src/lcd.h src/lcd_font.h
     src/mcu_interrupt.cpp src/mcu_interrupt.h
     src/mcu_opcodes.cpp src/mcu_opcodes.h
-    src/mcu_timer.cpp src/mcu_timer.h
-    src/midi.h
-    src/pcm.cpp src/pcm.h
-    src/submcu.cpp src/submcu.h
-
-    src/utils/files.cpp src/utils/files.h
 )
-
-if(USE_PORTMIDI)
-    list(APPEND SC55_SRC src/midi_portmidi.cpp)
-elseif(WIN32)
-    list(APPEND SC55_SRC src/midi_win32.cpp)
-endif()
 
 add_executable(nuked-sc55 ${SC55_SRC} ${UTF8MAIN_SRCS})
 set_nopie(nuked-sc55)
@@ -212,12 +210,15 @@ if(MSVC)
     target_compile_definitions(nuked-sc55 PRIVATE WIN32_CONSOLE)
 endif()
 
+target_include_directories(nuked-sc55 PRIVATE 3rdparty)
+
 if(TARGET SDL2::SDL2)
-    target_link_libraries(nuked-sc55 PRIVATE SDL2::SDL2)
+    find_package(OpenGL REQUIRED)
+    target_link_libraries(nuked-sc55 PRIVATE SDL2::SDL2 OpenGL::GL imgui)
 else()
     string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
     target_include_directories(nuked-sc55 PRIVATE ${SDL2_INCLUDE_DIRS})
-    target_link_libraries(nuked-sc55 PRIVATE ${SDL2_LIBRARIES})
+    target_link_libraries(nuked-sc55 PRIVATE ${SDL2_LIBRARIES} imgui)
 endif()
 
 if(USE_PORTMIDI)
