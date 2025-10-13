@@ -55,6 +55,26 @@ enum {
     DEV_ADDRDL = 0x07,
     DEV_ADCSR = 0x08,
     DEV_ADCR = 0x09,
+
+    // ISP
+    DEV_ISFL  = 0x30, // ISP interrupt status flags
+    DEV_ISFH  = 0x31,
+    DEV_IOF2  = 0x32, // ISP I/O flags
+    DEV_IOF1  = 0x33,
+    DEV_IOF0  = 0x34,
+    DEV_EGF   = 0x35, // ISP edge detection flags
+    DEV_ICFH  = 0x36, // ISP interconnection flags
+    DEV_ICFL  = 0x37,
+    DEV_IEFH  = 0x38, // ISP interrupt enable flags
+    DEV_IEFL  = 0x39,
+    DEV_IOIEH = 0x3a, // ISP I/O interrupt enable flags
+    DEV_IOIEL = 0x3b,
+    DEV_CLEH  = 0x3c, // ISP read clear enable
+    DEV_CLEL  = 0x3d,
+    DEV_EVER  = 0x3f, // ISP event input enable
+    // ISP data regs (0x40 - 0x7f)
+    DEV_IPR   = 0x98, // ISP page reg
+    DEV_ICSR  = 0x99, // ISP control status reg
 };
 
 extern uint8_t dev_register[0x100];

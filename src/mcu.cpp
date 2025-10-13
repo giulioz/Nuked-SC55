@@ -69,6 +69,7 @@ uint8_t ram[RAM_SIZE];
 uint8_t sram[SRAM_SIZE];
 uint8_t unk_e8_buf[SRAM_SIZE];
 int rom_mask = ROM_SIZE - 1;
+uint16_t isp_dr[32] = {0};
 
 uint8_t csp1[0x4000];
 uint8_t csp2[0x4000];
@@ -119,12 +120,22 @@ uint8_t MCU_Read(uint32_t address, bool code) {
       adf_rd = (dev_register[devSlot] & 0x80) != 0;
       return dev_register[devSlot];
     }
+    
     else if (address_low == 0xfe91) // P6 (GA?)
       return 0x00;
     else if (address_low == 0xfe94) // P9 (pcm card present?)
       return 0x00;
     else if (address_low == 0xfe96) // P11 (exp board present)
       return 0x00;
+    
+    else if (address_low >= 0xfec0 && address_low <= 0xfeff) { // ISP dr
+      printf("isp read dr %02x\n", (address_low >> 1) & 31);
+      if ((address_low & 1) == 1)
+        return isp_dr[(address_low - 0xfec0) >> 1] & 0xff;
+      else
+        return (isp_dr[(address_low - 0xfec0) >> 1] >> 8) & 0xff;
+    }
+    
     else {
       printf("dev read %06x\n", address);
       return dev_register[devSlot];
@@ -201,10 +212,8 @@ void MCU_Write(uint32_t address, uint8_t value) {
   // cpu dev
   if ((page == 0x00 || page == 0xff) &&
       (address_low >= 0xfe80 && address_low <= 0xff7f)) {
-    printf("dev write %06x = %02x\n", address, value);
     int devSlot = address - 0xfe80;
-    dev_register[devSlot] = value;
-
+    
     if (devSlot == DEV_ADCSR) {
       dev_register[devSlot] &= ~0x7f;
       dev_register[devSlot] |= value & 0x7f;
@@ -214,7 +223,19 @@ void MCU_Write(uint32_t address, uint8_t value) {
       }
       if ((value & 0x40) == 0)
         MCU_Interrupt_SetRequest(INTERRUPT_SOURCE_ADI, 0);
-      return;
+    }
+    
+    else if (address_low >= 0xfec0 && address_low <= 0xfeff) { // ISP dr
+      if ((address_low & 1) == 1)
+        isp_dr[(address_low - 0xfec0) >> 1] = (isp_dr[(address_low - 0xfec0) >> 1] & 0xff00) | value;
+      else
+        isp_dr[(address_low - 0xfec0) >> 1] = (isp_dr[(address_low - 0xfec0) >> 1] & 0x00ff) | (value << 8);
+      printf("isp write dr %02x = %04x\n", (address_low >> 1) & 31, isp_dr[(address_low - 0xfec0) >> 1]);
+    }
+    
+    else {
+      printf("dev write %06x = %02x\n", address, value);
+      dev_register[devSlot] = value;
     }
   }
 
@@ -390,6 +411,14 @@ void renderImgui() {
   sram_view.DrawWindow("SRAM", sram, SRAM_SIZE);
   unk_e8_buf_view.DrawWindow("unk_e8_buf", unk_e8_buf, SRAM_SIZE);
   lcd_ram_view.DrawWindow("LCD RAM", lcd.memory, 0x2000);
+
+  ImGui::Begin("LCD Params");
+  ImGui::Text("scroll_sad1: %04x", lcd.scroll_sad1);
+  ImGui::Text("scroll_sad2: %04x", lcd.scroll_sad2);
+  ImGui::Text("scroll_sad3: %04x", lcd.scroll_sad3);
+  ImGui::Text("scroll_sad4: %04x", lcd.scroll_sad4);
+  ImGui::Text("cgram_adr: %04x", lcd.cgram_adr);
+  ImGui::End();
 
   ImGui::Begin("Control");
   ImGui::Text("PC: %02x:%04x", mcu.cp, mcu.pc);

@@ -28,9 +28,17 @@ public:
   uint8_t scroll_sl1 = 0; // screen lines
   uint8_t scroll_sl2 = 0;
 
+  uint8_t hdot_scr = 0; // horizontal scroll
+
+  uint8_t mx_mode = 0; // composition method
+  bool block1_graphics = 0;
+  bool block3_graphics = 0;
+  bool three_layer_mode = 0;
+
+  uint16_t cgram_adr = 0;
+
   uint8_t cursor_dir = 0;
   uint16_t cursor = 0;
-
   uint8_t memory[0x2000] = {0};
 
   void writeData(uint8_t value) {
@@ -129,6 +137,35 @@ public:
       cursor += 1; // hack
       return;
     }
+
+    if (mode == 0x5a) {
+      // set horiz scroll position
+      hdot_scr = value & 0b111;
+      return;
+    }
+
+    if (mode == 0x5b) {
+      // set display overlay format
+      mx_mode = value & 3;
+      block1_graphics = (value & 4) != 0;
+      block3_graphics = (value & 8) != 0;
+      three_layer_mode = (value & 16) != 0;
+      return;
+    }
+
+    if (mode == 0x5c) {
+      // set char gen start address
+      switch (stage) {
+      case 0:
+        cgram_adr = (cgram_adr & 0xff00) | value;
+        break;
+      case 1:
+        cgram_adr = (cgram_adr & 0x00ff) | (value << 8);
+        break;
+      }
+      stage += 1;
+      return;
+    }
   }
 
   void writeParam(uint8_t value) {
@@ -174,16 +211,20 @@ public:
 
     if (value == 0x5a) {
       // set horiz scroll position
+      mode = 0x5a;
       return;
     }
 
     if (value == 0x5b) {
       // set display overlay format
+      mode = 0x5b;
       return;
     }
 
     if (value == 0x5c) {
       // set char gen start address
+      mode = 0x5c;
+      stage = 0;
       return;
     }
 
@@ -191,5 +232,7 @@ public:
       // set cursor type
       return;
     }
+
+    printf("lcd unimplemented param %02x\n", value);
   }
 };
