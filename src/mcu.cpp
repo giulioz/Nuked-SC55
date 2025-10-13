@@ -3082,7 +3082,7 @@ void MCU_Write(uint32_t address, uint8_t value)
                     uint32_t addr = (mixer_reg[6] << 8) | mixer_reg[7];
                     uint32_t data = (mixer_reg[3] << 24) | (mixer_reg[2] << 16) | (mixer_reg[1] << 8) | mixer_reg[0];
                     dsp_temp[addr] = data;
-                    printf("DSP ram write %04x=%08x\n", addr, data);
+                    // printf("DSP ram write %04x=%08x\n", addr, data);
                 }
                 else if (address == 0xe005) {
                     uint32_t addr = (mixer_reg[4] << 8) | mixer_reg[5];
@@ -3090,7 +3090,7 @@ void MCU_Write(uint32_t address, uint8_t value)
                     // mixer_reg[2] = (dsp_temp[addr] >> 16) & 0xff;
                     // mixer_reg[1] = (dsp_temp[addr] >> 8) & 0xff;
                     // mixer_reg[0] = dsp_temp[addr] & 0xff;
-                    printf("DSP ram read %04x=%08x\n", addr, dsp_temp[addr]);
+                    // printf("DSP ram read %04x=%08x\n", addr, dsp_temp[addr]);
                     // printf("DSP ram ?? %04x\n", addr);
                 }
                 else if (address == 0xe009) {
