@@ -36,104 +36,58 @@
 #include "mcu_opcodes.h"
 #include "mcu_interrupt.h"
 
-int32_t MCU_SUB_Common(int32_t t1, int32_t t2, int32_t c_bit, uint32_t siz)
-{
-    int32_t st1, st2;
-    int32_t N, Z, C, V = 0;
-    if (siz)
-    {
-        st1 = (int16_t)t1;
-        st2 = (int16_t)t2;
-        t1 = (uint16_t)t1;
-        t2 = (uint16_t)t2;
-        t1 -= t2;
-        t1 -= c_bit;
-        C = (t1 >> 16) & 1;
+int32_t MCU_SUB_Common(int32_t t1, int32_t t2, int32_t c_bit, uint32_t siz) {
+    const unsigned bits = siz ? 16u : 8u;
+    const uint32_t mask = (1u << bits) - 1u;
+    const uint32_t msb  = 1u << (bits - 1u);
 
-        t1 &= 0xffff;
-        N = (t1 & 0x8000) != 0;
-        Z = t1 == 0;
+    // Unsigned view of inputs (sized)
+    uint32_t a = (uint32_t)t1 & mask;
+    uint32_t b = (uint32_t)t2 & mask;
+    uint32_t c = (uint32_t)c_bit & 1u;
 
-        st1 -= st2;
-        st1 -= c_bit;
-        if (st1 < INT16_MIN || st1 > INT16_MAX)
-            V = 1;
-    }
-    else
-    {
-        st1 = (int8_t)t1;
-        st2 = (int8_t)t2;
-        t1 = (uint8_t)t1;
-        t2 = (uint8_t)t2;
-        t1 -= t2;
-        t1 -= c_bit;
-        C = (t1 >> 8) & 1;
+    // result and BORROW (C=borrow)
+    uint32_t result = (a - b - c) & mask;
+    uint32_t borrow = (a < (b + c)) ? 1u : 0u;
 
-        t1 &= 0xff;
-        N = (t1 & 0x80) != 0;
-        Z = t1 == 0;
+    // Signed overflow check on sized operands
+    int32_t sa = siz ? (int16_t)a : (int8_t)a;
+    int32_t sb = siz ? (int16_t)b : (int8_t)b;
+    int32_t sres = sa - sb - (int)c;
+    uint32_t V = (siz ? (sres < INT16_MIN || sres > INT16_MAX)
+                      : (sres < INT8_MIN  || sres > INT8_MAX)) ? 1u : 0u;
 
-        st1 -= st2;
-        st1 -= c_bit;
-        if (st1 < INT8_MIN || st1 > INT8_MAX)
-            V = 1;
-    }
-    MCU_SetStatus(N, STATUS_N);
-    MCU_SetStatus(Z, STATUS_Z);
-    MCU_SetStatus(C, STATUS_C);
+    MCU_SetStatus((result & msb) != 0, STATUS_N);
+    MCU_SetStatus(result == 0, STATUS_Z);
+    MCU_SetStatus(borrow, STATUS_C);      // C=1 on borrow per manual
     MCU_SetStatus(V, STATUS_V);
-
-    return t1;
+    return (int32_t)result;
 }
 
-int32_t MCU_ADD_Common(int32_t t1, int32_t t2, int32_t c_bit, uint32_t siz)
-{
-    int32_t st1, st2;
-    int32_t N, Z, C, V = 0;
-    if (siz)
-    {
-        st1 = (int16_t)t1;
-        st2 = (int16_t)t2;
-        t1 = (uint16_t)t1;
-        t2 = (uint16_t)t2;
-        t1 += t2;
-        t1 += c_bit;
-        C = (t1 >> 16) & 1;
+int32_t MCU_ADD_Common(int32_t t1, int32_t t2, int32_t c_bit, uint32_t siz) {
+    const unsigned bits = siz ? 16u : 8u;
+    const uint32_t mask = (1u << bits) - 1u;
+    const uint32_t msb  = 1u << (bits - 1u);
 
-        t1 &= 0xffff;
-        N = (t1 & 0x8000) != 0;
-        Z = t1 == 0;
+    uint32_t a = (uint32_t)t1 & mask;
+    uint32_t b = (uint32_t)t2 & mask;
+    uint32_t c = (uint32_t)c_bit & 1u;
 
-        st1 += st2;
-        st1 += c_bit;
-        if (st1 < INT16_MIN || st1 > INT16_MAX)
-            V = 1;
-    }
-    else
-    {
-        st1 = (int8_t)t1;
-        st2 = (int8_t)t2;
-        t1 = (uint8_t)t1;
-        t2 = (uint8_t)t2;
-        t1 += t2;
-        t1 += c_bit;
-        C = (t1 >> 8) & 1;
+    uint32_t wide = a + b + c;            // up to 17 bits
+    uint32_t result = wide & mask;
+    uint32_t carry  = (wide >> bits) & 1u;
 
-        t1 &= 0xff;
-        N = (t1 & 0x80) != 0;
-        Z = t1 == 0;
+    int32_t sa = siz ? (int16_t)a : (int8_t)a;
+    int32_t sb = siz ? (int16_t)b : (int8_t)b;
+    int32_t sres = sa + sb + (int)c;
+    uint32_t V = (siz ? (sres < INT16_MIN || sres > INT16_MAX)
+                      : (sres < INT8_MIN  || sres > INT8_MAX)) ? 1u : 0u;
 
-        st1 += st2;
-        st1 += c_bit;
-        if (st1 < INT8_MIN || st1 > INT8_MAX)
-            V = 1;
-    }
-    MCU_SetStatus(N, STATUS_N);
-    MCU_SetStatus(Z, STATUS_Z);
-    MCU_SetStatus(C, STATUS_C);
+    MCU_SetStatus((result & msb) != 0, STATUS_N);
+    MCU_SetStatus(result == 0, STATUS_Z);
+    MCU_SetStatus(carry, STATUS_C);       // carry out
     MCU_SetStatus(V, STATUS_V);
-
-    return t1;
+    return (int32_t)result;
 }
 
 void MCU_Operand_Nop(uint8_t operand)
@@ -178,7 +132,7 @@ void MCU_LDM(uint8_t operand)
         if (rlist & (1 << i))
         {
             uint16_t data = MCU_PopStack();
-            if (i != 7)
+            // if (i != 7)
                 mcu.r[i] = data;
         }
     }
@@ -193,8 +147,8 @@ void MCU_STM(uint8_t operand)
         if (rlist & (1 << i))
         {
             uint16_t data = mcu.r[i];
-            if (i == 7)
-                data -= 2;
+            // if (i == 7)
+            //     data -= 2;
             MCU_PushStack(data);
         }
     }
@@ -279,13 +233,11 @@ void MCU_Jump_Bcc(uint8_t operand)
     uint32_t cond;
     uint32_t branch = 0;
     uint32_t N, C, Z, V;
-    if (operand & 0x10)
-    {
-        disp = MCU_ReadCodeAdvance() << 8;
-        disp |= MCU_ReadCodeAdvance();
-    }
-    else
-    {
+    if ((operand & 0xF0) == 0x30) {
+        // d:16 (signed)
+        disp = (int16_t)((MCU_ReadCodeAdvance() << 8) | MCU_ReadCodeAdvance());
+    } else {
+        // d:8 (signed)
         disp = (int8_t)MCU_ReadCodeAdvance();
     }
     cond = operand & 0x0f;
@@ -1062,7 +1014,6 @@ void MCU_Opcode_CLR(uint8_t opcode, uint8_t opcode_reg)
 
 void MCU_Opcode_LDC(uint8_t opcode, uint8_t opcode_reg)
 {
-    // FIXME: Check also other cases
     if (operand_reg == 7 && opcode_reg == 4)
     {
         operand_size = 1;
@@ -1082,7 +1033,6 @@ void MCU_Opcode_LDC(uint8_t opcode, uint8_t opcode_reg)
 
 void MCU_Opcode_STC(uint8_t opcode, uint8_t opcode_reg)
 {
-    // FIXME: Check also other cases
     if (operand_reg == 7 && opcode_reg == 4)
     {
         operand_size = 1;

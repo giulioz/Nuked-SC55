@@ -263,8 +263,9 @@ inline void MCU_ControlRegisterWrite(uint32_t reg, uint32_t siz, uint32_t data)
         }
         else if (reg == 4) // FIXME: undocumented
         {
-            // printf("fixme 4 %04x\n", data);
+            // printf("%x%04x: fixme 4 %02x\n", mcu.cp, mcu.pc, data);
             mcu.ep = data & 0xff;
+            mcu.dp = (data >> 8) & 0xff; // unsure
         }
         else if (reg == 3) // FIXME: undocumented
         {
@@ -331,7 +332,7 @@ inline uint32_t MCU_ControlRegisterRead(uint32_t reg, uint32_t siz)
         else if (reg == 4) // FIXME: undocumented
         {
             // printf("fixme 9\n");
-            ret = mcu.ep | (mcu.ep << 8);
+            ret = mcu.ep | (mcu.dp << 8);
         }
         else if (reg == 3) // FIXME: undocumented
         {
